@@ -134,6 +134,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const signOut = useCallback(async () => {
     setOfficer(null);
+    await repo.signOut().catch(() => {}); 
     await AsyncStorage.removeItem(K.session).catch(() => {});
   }, []);
 

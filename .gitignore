@@ -62,3 +62,5 @@ firebase-debug.log*
 
 # EAS local credentials
 credentials.json
+
+serviceAccountKey.json

@@ -1,71 +1,157 @@
-/**
- * Data layer. Everything the screens need goes through here.
- * Right now it is an in-memory fake so the UI runs without a backend.
- * To go live: re-implement these functions with Firebase (Firestore + Auth)
- * and keep the same signatures. No screen needs to change.
- */
-import { Announcement, Data, EventItem, Officer } from './types';
-import { seedData } from './mock';
+// Firestore-backed repo. Same interface your store.tsx already calls:
+//   repo.fetchAll / signIn / signOut / saveAnnouncement / deleteAnnouncement / saveEvent / deleteEvent
+// Save the old mock as repo.mock.ts first, then put this at src/lib/repo.ts.
+import {
+  signOut as fbSignOut,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { auth, db } from "../firebase";
+import type { Announcement, Data, EventItem, Officer, Org } from "./types";
 
-/** Flip `offline` to true while testing to see the cached / "No connection" states. */
-export const sim = { offline: false, fail: false, delayMs: 150 };
-export class OfflineError extends Error {}
-
-let db: Data = seedData();
-const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
-
-async function gate() {
-  await new Promise<void>((r) => setTimeout(r, sim.delayMs));
-  if (sim.offline) throw new OfflineError('offline');
-  if (sim.fail) throw new Error('boom');
+export class OfflineError extends Error {
+  constructor(msg = "No connection") {
+    super(msg);
+    Object.setPrototypeOf(this, OfflineError.prototype);
+  }
 }
-const upsert = <T extends { id: string }>(list: T[], item: T) =>
-  list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [item, ...list];
 
-// Officer accounts are created by an admin only. No self sign-up.
-const ACCOUNTS = [
-  { email: 'sslg@sagaysync.test', password: 'sagaysync', orgId: 'sslg' },
-  { email: 'angsigay@sagaysync.test', password: 'sagaysync', orgId: 'angsigay' },
-  { email: 'theshell@sagaysync.test', password: 'sagaysync', orgId: 'theshell' },
-  { email: 'spc@sagaysync.test', password: 'sagaysync', orgId: 'spc' },
-];
+const withId = <T>(d: { id: string; data: () => any }) =>
+  ({ ...d.data(), id: d.id }) as T;
+
+/** Firestore rejects `undefined` fields. */
+const clean = <T extends object>(o: T) =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+
+const guard = async <T>(fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (e: any) {
+    if (e?.code === "unavailable" || e?.code === "auth/network-request-failed")
+      throw new OfflineError();
+    throw e;
+  }
+};
+
+async function myOrgId(): Promise<string | null> {
+  await auth.authStateReady(); // wait for the saved login to be restored on app start
+  const u = auth.currentUser;
+  if (!u) return null;
+  const s = await getDoc(doc(db, "officers", u.uid));
+  return s.exists() ? (s.data().orgId as string) : null;
+}
 
 export const repo = {
+  /** Everything the app shows. Guests get live content only; officers also get their own group's drafts. */
   async fetchAll(): Promise<Data> {
-    await gate();
-    return clone(db);
+    return guard(async () => {
+      const orgId = await myOrgId();
+
+      const [orgSnap, annSnap, evSnap] = await Promise.all([
+        getDocs(collection(db, "orgs")),
+        getDocs(
+          query(
+            collection(db, "announcements"),
+            where("status", "in", ["published", "scheduled"]),
+          ),
+        ),
+        getDocs(
+          query(collection(db, "events"), where("status", "==", "published")),
+        ),
+      ]);
+
+      const anns = new Map<string, Announcement>();
+      const evs = new Map<string, EventItem>();
+      annSnap.docs.forEach((d) => anns.set(d.id, withId<Announcement>(d)));
+      evSnap.docs.forEach((d) => evs.set(d.id, withId<EventItem>(d)));
+
+      if (orgId) {
+        const [myAnn, myEv] = await Promise.all([
+          getDocs(
+            query(collection(db, "announcements"), where("orgId", "==", orgId)),
+          ),
+          getDocs(query(collection(db, "events"), where("orgId", "==", orgId))),
+        ]);
+        myAnn.docs.forEach((d) => anns.set(d.id, withId<Announcement>(d)));
+        myEv.docs.forEach((d) => evs.set(d.id, withId<EventItem>(d)));
+      }
+
+      return {
+        orgs: orgSnap.docs.map((d) => withId<Org>(d)),
+        announcements: [...anns.values()],
+        events: [...evs.values()],
+      };
+    });
   },
-  async saveAnnouncement(a: Announcement) {
-    await gate();
-    // one pinned post per group: pinning replaces the current one
-    if (a.pinned && a.status !== 'draft') {
-      db.announcements = db.announcements.map((x) => (x.orgId === a.orgId && x.id !== a.id ? { ...x, pinned: false } : x));
-    }
-    db.announcements = upsert(db.announcements, a);
-  },
-  async deleteAnnouncement(id: string) {
-    await gate();
-    db.announcements = db.announcements.filter((x) => x.id !== id);
-  },
-  async saveEvent(e: EventItem) {
-    await gate();
-    db.events = upsert(db.events, e);
-  },
-  async deleteEvent(id: string) {
-    await gate();
-    db.events = db.events.filter((x) => x.id !== id);
-  },
+
   async signIn(email: string, password: string): Promise<Officer> {
-    await gate();
-    const acc = ACCOUNTS.find((a) => a.email === email.trim().toLowerCase() && a.password === password);
-    if (!acc) throw new Error('invalid-credentials');
-    return { email: acc.email, orgId: acc.orgId };
+    try {
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+      const s = await getDoc(doc(db, "officers", cred.user.uid));
+      if (!s.exists()) {
+        await fbSignOut(auth);
+        throw new Error("not-officer");
+      }
+      return { email: cred.user.email ?? email.trim(), orgId: s.data().orgId };
+    } catch (e: any) {
+      console.log("LOGIN ERROR:", e?.code, e?.message);
+      if (e?.code === "auth/network-request-failed")
+        throw new Error("No connection. Try again.");
+      throw new Error("Incorrect email or password"); // never say which part was wrong
+    }
   },
-  async sendReset(_email: string) {
-    await gate();
+
+  async signOut() {
+    await fbSignOut(auth);
   },
-  async sendFeedback(rating: number, comment: string) {
-    await gate();
-    console.log('feedback', { rating, comment, at: new Date().toISOString() });
+
+  async saveAnnouncement(a: Announcement) {
+    await guard(async () => {
+      const ref = a.id
+        ? doc(db, "announcements", a.id)
+        : doc(collection(db, "announcements"));
+      // One pinned post per group: pinning this one un-pins the others.
+      if (a.pinned && a.status !== "draft") {
+        const snap = await getDocs(
+          query(
+            collection(db, "announcements"),
+            where("orgId", "==", a.orgId),
+            where("pinned", "==", true),
+          ),
+        );
+        await Promise.all(
+          snap.docs
+            .filter((d) => d.id !== ref.id)
+            .map((d) => updateDoc(d.ref, { pinned: false })),
+        );
+      }
+      await setDoc(ref, clean({ ...a, id: ref.id }));
+    });
   },
+  deleteAnnouncement: (id: string) =>
+    guard(() => deleteDoc(doc(db, "announcements", id))),
+
+  async saveEvent(e: EventItem) {
+    await guard(async () => {
+      const ref = e.id
+        ? doc(db, "events", e.id)
+        : doc(collection(db, "events"));
+      await setDoc(ref, clean({ ...e, id: ref.id }));
+    });
+  },
+  deleteEvent: (id: string) => guard(() => deleteDoc(doc(db, "events", id))),
 };

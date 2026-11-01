@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOfficer() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/officers/$(request.auth.uid));
+    }
+    function officerOrg() {
+      return get(/databases/$(database)/documents/officers/$(request.auth.uid)).data.orgId;
+    }
+
+    match /orgs/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /announcements/{id} {
+      allow read: if resource.data.status in ['published', 'scheduled']
+                  || (isOfficer() && resource.data.orgId == officerOrg());
+      allow create: if isOfficer() && request.resource.data.orgId == officerOrg();
+      allow update: if isOfficer() && resource.data.orgId == officerOrg()
+                    && request.resource.data.orgId == officerOrg();
+      allow delete: if isOfficer() && resource.data.orgId == officerOrg();
+    }
+
+    match /events/{id} {
+      allow read: if resource.data.status == 'published'
+                  || (isOfficer() && resource.data.orgId == officerOrg());
+      allow create: if isOfficer() && request.resource.data.orgId == officerOrg();
+      allow update: if isOfficer() && resource.data.orgId == officerOrg()
+                    && request.resource.data.orgId == officerOrg();
+      allow delete: if isOfficer() && resource.data.orgId == officerOrg();
+    }
+
+    // Create these by hand in the Console: officers/{uid} -> { email, orgId }
+    match /officers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}
