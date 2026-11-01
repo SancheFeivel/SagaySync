@@ -28,16 +28,37 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
+# Windows
+Thumbs.db
+Desktop.ini
 
 # typescript
 *.tsbuildinfo
 
+# example
 example
 
 # generated native folders
 /ios
 /android
+
+# ---------- SECRETS ----------
+# env files (keep the template committable)
+.env
+.env.*
+!.env.example
+
+# keys & certificates
+*.pem
+
+# Firebase / Google
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey*.json
+firebase-adminsdk*.json
+.firebase/
+firebase-debug.log*
+
+# EAS local credentials
+credentials.json
