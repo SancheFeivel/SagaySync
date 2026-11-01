@@ -8,6 +8,7 @@ import { Empty, FadeIn, Gate, IconButton, LastUpdated, LinkButton, Pill, Screen 
 import { AnnouncementRow, EventCard } from '../cards';
 import { openAnnouncement, openEvent } from '../nav';
 import { fmtHeaderDate } from '../date';
+import { AppHeader, HeaderIconButton } from '../AppHeader';
 
 const PAGE = 5;
 
@@ -65,14 +66,11 @@ export default function StudentHome() {
   );
 
   return (
-    <Screen>
-      <View style={s.top}>
-        <View>
-          <Text style={s.date}>{fmtHeaderDate()}</Text>
-          <Text style={s.wordmark}>Sagay<Text style={{ color: C.yellow }}>Sync</Text></Text>
-        </View>
-        <IconButton name="search" label="Search" onPress={() => router.push('/search')} />
-      </View>
+    <Screen edges={[]}>
+      <AppHeader
+        eyebrow={fmtHeaderDate()}
+        right={<HeaderIconButton name="search" label="Search" onPress={() => router.push('/search')} />}
+      />
       <LastUpdated />
       <Gate>
         <FlatList

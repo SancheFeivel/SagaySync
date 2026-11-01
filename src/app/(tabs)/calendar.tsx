@@ -7,6 +7,7 @@ import { EventRow } from '../../lib/cards';
 import { openEvent } from '../../lib/nav';
 import { DOW, MONTHS, cmpEvent, fmtFull, monthCells, pad, parseDate, toDateStr, todayStr } from '../../lib/date';
 import { EventItem } from '../../lib/types';
+import { HOLIDAY_LABEL, Holiday, holidaysBetween, holidaysOn } from '../../lib/holidays';
 
 export default function CalendarTab() {
   const { liveEvents, orgById } = useStore();
@@ -27,6 +28,16 @@ export default function CalendarTab() {
     liveEvents.forEach((e) => m.set(e.date, [...(m.get(e.date) ?? []), e]));
     return m;
   }, [liveEvents]);
+
+  const HolidayRow = ({ h }: { h: Holiday }) => (
+    <View style={s.holiday}>
+      <View style={s.holidayBar} />
+      <View style={{ flex: 1 }}>
+        <Text style={s.holidayName}>{h.name}</Text>
+        <Text style={s.holidayKind}>{HOLIDAY_LABEL[h.kind]}</Text>
+      </View>
+    </View>
+  );
 
   const header = (
     <View style={s.monthBar}>
@@ -53,6 +64,7 @@ export default function CalendarTab() {
     const cells = monthCells(cur.y, cur.m);
     const today = todayStr();
     const dayEvents = [...(byDate.get(sel) ?? [])].sort(cmpEvent);
+    const dayHolidays = holidaysOn(sel);
     return (
       <>
         <View style={s.card}>
@@ -65,10 +77,11 @@ export default function CalendarTab() {
               if (!c) return <View key={i} style={s.cell} />;
               const selected = c === sel;
               const isToday = c === today;
+              const isHoliday = holidaysOn(c).some((h) => h.kind !== 'working');
               return (
                 <Pressable key={c} accessibilityRole="button" accessibilityLabel={fmtFull(c)} accessibilityState={{ selected }} style={s.cell} onPress={() => setSel(c)}>
-                  <View collapsable={false} style={[s.day, selected && !isToday && s.selectedFill, isToday && s.today, selected && s.selected]}>
-                    <Text style={[s.dayT, (selected || isToday) && { fontWeight: '800' }, isToday && { color: '#fff' }]}>
+                  <View collapsable={false} style={[s.day, isHoliday && !selected && !isToday && s.holidayFill, selected && !isToday && s.selectedFill, isToday && s.today, selected && s.selected]}>
+                    <Text style={[s.dayT, (selected || isToday) && { fontWeight: '800' }, isHoliday && !isToday && { color: C.navy2, fontWeight: '800' }, isToday && { color: '#fff' }]}>
                       {parseDate(c).getDate()}
                     </Text>
                     {byDate.has(c) ? <View style={[s.dot, selected && !isToday && { backgroundColor: C.navy }]} /> : null}
@@ -83,7 +96,9 @@ export default function CalendarTab() {
           <Text style={s.sel}>{fmtFull(sel)}</Text>
           <Text style={s.count}>{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Text>
         </View>
-        {dayEvents.length === 0 ? <Empty text="No events on this day." /> : dayEvents.map((e, i) => (
+        {dayHolidays.map((h) => <HolidayRow key={h.date + h.name} h={h} />)}
+        {dayEvents.length === 0 && dayHolidays.length === 0 ? <Empty text="No events on this day." /> : null}
+        {dayEvents.map((e, i) => (
           <FadeIn key={e.id} index={i}><EventRow e={e} org={orgById(e.orgId)} mode="time" onPress={() => openEvent(e.id)} /></FadeIn>
         ))}
       </>
@@ -94,13 +109,15 @@ export default function CalendarTab() {
     const prefix = `${cur.y}-${pad(cur.m + 1)}`;
     const list = liveEvents.filter((e) => e.date.startsWith(prefix) && (past || e.date >= todayStr())).sort(cmpEvent);
     const groups = list.reduce<Record<string, EventItem[]>>((acc, e) => ((acc[e.date] = [...(acc[e.date] ?? []), e]), acc), {});
+    const monthHolidays = holidaysBetween(`${prefix}-01`, `${prefix}-31`).filter((h) => past || h.date >= todayStr());
+    const dates = Array.from(new Set([...Object.keys(groups), ...monthHolidays.map((h) => h.date)])).sort();
     return (
       <>
         <View style={[s.card, { paddingBottom: 4 }]}>{header}</View>
         <View style={{ alignItems: 'flex-end', marginTop: 6 }}>
           <LinkButton title={past ? 'Hide past events' : 'Show past events'} onPress={() => setPast((p) => !p)} />
         </View>
-        {list.length === 0 ? <Empty text={`No events scheduled for ${MONTHS[cur.m]}.`} /> : Object.keys(groups).map((d, gi) => {
+        {dates.length === 0 ? <Empty text={`No events scheduled for ${MONTHS[cur.m]}.`} /> : dates.map((d, gi) => {
           const dt = parseDate(d);
           return (
             <FadeIn key={d} index={gi}>
@@ -110,7 +127,8 @@ export default function CalendarTab() {
                   <Text style={s.wk}>{DOW[dt.getDay()].toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  {groups[d].map((e) => <EventRow key={e.id} e={e} org={orgById(e.orgId)} mode="time" onPress={() => openEvent(e.id)} />)}
+                  {holidaysOn(d).map((h) => <HolidayRow key={h.name} h={h} />)}
+                  {(groups[d] ?? []).map((e) => <EventRow key={e.id} e={e} org={orgById(e.orgId)} mode="time" onPress={() => openEvent(e.id)} />)}
                 </View>
               </View>
             </FadeIn>
@@ -142,12 +160,17 @@ const s = StyleSheet.create({
   },
   today: { backgroundColor: C.navy },
   selected: { borderColor: C.yellow },
+  holidayFill: { backgroundColor: '#EEF1F8' },
   selectedFill: { backgroundColor: '#FFF9E5' },
   dayT: { fontWeight: '600', color: C.text, fontSize: 15 },
   dot: { position: 'absolute', bottom: 3, width: 6, height: 6, borderRadius: 3, backgroundColor: C.yellow },
   listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22, marginBottom: 10, paddingHorizontal: 4 },
   sel: { fontSize: 16, fontWeight: '800', color: C.text },
   count: { color: C.muted, fontWeight: '600', fontSize: 12 },
+  holiday: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#EEF1F8', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#DCE3F0' },
+  holidayBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: C.navy2 },
+  holidayName: { fontSize: 16, fontWeight: '700', color: C.text },
+  holidayKind: { color: C.muted, fontSize: 12, marginTop: 2 },
   agendaDate: { width: 52, alignItems: 'center', paddingTop: 10 },
   big: { fontSize: 26, fontWeight: '800', color: C.navy },
   wk: { fontSize: 11, fontWeight: '800', color: C.muted },

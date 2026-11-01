@@ -10,6 +10,7 @@ import { openAnnouncement, openEvent } from '../nav';
 import { Announcement, EventItem } from '../types';
 import { fmtShort, fmtStamp, fmtTime } from '../date';
 import { ScrollView } from 'react-native';
+import { AppHeader, HeaderIconButton } from '../AppHeader';
 
 type Item = { kind: 'announcement'; a: Announcement; at: string } | { kind: 'event'; e: EventItem; at: string };
 type St = 'Published' | 'Scheduled' | 'Draft';
@@ -69,8 +70,8 @@ export default function OfficerHome() {
       <View style={s.share}>
         <Text style={s.shareT}>What are you sharing?</Text>
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-          <Button title="Announcement" icon="megaphone-outline" variant="yellow" style={{ flex: 1 }} onPress={() => router.push('/new-announcement')} />
-          <Button title="Event" icon="calendar-outline" variant="yellow" style={{ flex: 1 }} onPress={() => router.push('/new-event')} />
+          <Button title="Announcement" icon="megaphone-outline" variant="yellow" style={{ flex: 1.6, paddingHorizontal: 12 }} onPress={() => router.push('/new-announcement')} />
+          <Button title="Event" icon="calendar-outline" variant="yellow" style={{ flex: 1, paddingHorizontal: 12 }} onPress={() => router.push('/new-event')} />
         </View>
       </View>
       <Text style={s.section}>Your posts</Text>
@@ -81,14 +82,11 @@ export default function OfficerHome() {
   );
 
   return (
-    <Screen>
-      <View style={s.top}>
-        <View>
-          <Text style={s.small}>Officer</Text>
-          <Text style={s.wordmark}>Sagay<Text style={{ color: C.yellow }}>Sync</Text></Text>
-        </View>
-        <View style={s.chip}><Ionicons name="person-circle-outline" size={16} color={C.navy} /><Text style={s.chipT}>{org.name}</Text></View>
-      </View>
+    <Screen edges={[]}>
+      <AppHeader
+        eyebrow="Officer"
+        right={<View style={s.chip}><Ionicons name="person-circle-outline" size={16} color={C.navy} /><Text style={s.chipT}>{org.name}</Text></View>}
+      />
       <Gate>
         <FlatList
           data={shown} keyExtractor={(it) => (it.kind === 'announcement' ? it.a.id : it.e.id)}
