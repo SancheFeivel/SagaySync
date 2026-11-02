@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { C, MIN_TAP } from '../lib/theme';
+import { PAD } from '../lib/theme';
 import { useStore } from '../lib/store';
-import { Button, Input, Screen, Segmented, TopBar } from '../lib/ui';
+import { Button, Input, Label, Screen, Segmented, SwitchRow, TopBar } from '../lib/ui';
 import { DateTimeField } from '../lib/DateTimeField';
 import { useUnsavedGuard } from '../lib/useUnsavedGuard';
 import { fmtShort, fmtTime, parseDate, timeToDate, toDateStr, toTimeStr } from '../lib/date';
@@ -71,7 +71,7 @@ export default function NewEvent() {
     <Screen edges={['top', 'bottom']}>
       <TopBar title={existing ? 'Edit event' : 'New event'} icon="close" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           <Input label="Title" value={title} onChangeText={setTitle} placeholder="Event name" />
           <DateTimeField label="Date" mode="date" value={date} onChange={setDate} />
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -80,26 +80,21 @@ export default function NewEvent() {
           </View>
           <Input label="Venue" value={venue} onChangeText={setVenue} placeholder="Where is it?" />
 
-          <Text style={{ fontWeight: '700', color: C.text, marginBottom: 8 }}>Audience</Text>
+          <Label>Audience</Label>
           <View style={{ marginBottom: 16 }}><Segmented options={AUD} value={audience} onChange={setAudience} /></View>
 
           <Input label="Details" multiline value={body} onChangeText={setBody} placeholder="Anything students should know" />
 
           {existing ? (
             <>
-              <Text style={{ fontWeight: '700', color: C.text, marginBottom: 8 }}>Status</Text>
+              <Label>Status</Label>
               <View style={{ marginBottom: 16 }}><Segmented options={TAGS} value={tag} onChange={setTag} /></View>
             </>
           ) : null}
 
-          {canLink ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: MIN_TAP, marginBottom: 8 }}>
-              <Text style={{ fontWeight: '700', color: C.text, flex: 1 }}>Also post an announcement</Text>
-              <Switch value={alsoPost} onValueChange={setAlsoPost} trackColor={{ true: C.navy }} thumbColor={C.yellow} />
-            </View>
-          ) : null}
+          {canLink ? <SwitchRow label="Also post an announcement" value={alsoPost} onChange={setAlsoPost} /> : null}
 
-          <View style={{ gap: 10, marginTop: 12 }}>
+          <View style={{ gap: 12, marginTop: 16 }}>
             <Button title={existing && existing.status === 'published' ? 'Save changes' : 'Publish'} disabled={!ready} onPress={() => finish(false)} />
             {!existing || existing.status === 'draft' ? <Button title="Save draft" variant="ghost" disabled={!draftable} onPress={() => finish(true)} /> : null}
           </View>

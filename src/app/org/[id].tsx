@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { C } from '../../lib/theme';
+import { C, CARD, ICON, MIN_TAP, PRESSED, R, SERIF, SP, TYPE } from '../../lib/theme';
 import { postTime, useStore } from '../../lib/store';
 import { Button, Empty, FadeIn, IconButton, LinkButton, Monogram, Screen, Segmented } from '../../lib/ui';
 import { AnnouncementRow, EventRow } from '../../lib/cards';
@@ -31,9 +31,13 @@ export default function OrgProfile() {
 
   return (
     <Screen edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, paddingBottom: 40 }}>
       <View style={s.head}>
-        <IconButton name="chevron-back" label="Back" color="#fff" onPress={() => router.back()} />
-        <View style={{ alignItems: 'center', gap: 6, paddingBottom: 16 }}>
+        <View pointerEvents="none" style={s.ring} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={({ pressed }) => [s.back, pressed && PRESSED]}>
+          <Ionicons name="chevron-back" size={ICON.lg} color={C.navy} />
+        </Pressable>
+        <View style={{ alignItems: 'center', gap: SP.sm, paddingBottom: SP.xxl }}>
           <Monogram org={org} size={64} inverted />
           <Text style={s.name}>{org.name}</Text>
           <Text style={s.full}>{org.fullName}</Text>
@@ -43,9 +47,8 @@ export default function OrgProfile() {
           />
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        <Segmented options={TABS} value={tab} onChange={setTab} />
-        <View style={{ height: 14 }} />
+        <View style={s.tabs}><Segmented options={TABS} value={tab} onChange={setTab} /></View>
+        <View style={{ height: 16 }} />
         {tab === 'Posts' && (posts.length === 0 ? <Empty text="Nothing posted yet." /> : posts.map((a, i) => (
           <FadeIn key={a.id} index={i}><AnnouncementRow a={a} org={org} onPress={() => openAnnouncement(a.id)} /></FadeIn>
         )))}
@@ -63,7 +66,7 @@ export default function OrgProfile() {
             {([['Adviser', org.adviser], ['President', org.president], ['Office', org.office]] as const).map(([k, v]) => (
               <View key={k} style={s.kv}><Text style={s.k}>{k}</Text><Text style={s.v}>{v}</Text></View>
             ))}
-            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(org.facebook)} style={[s.kv, { minHeight: 48 }]}>
+            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(org.facebook)} style={({ pressed }) => [s.kv, { minHeight: 48 }, pressed && PRESSED]}>
               <Ionicons name="logo-facebook" size={20} color={C.navy2} />
               <Text style={{ color: C.navy2, fontWeight: '700' }}>Facebook page</Text>
             </Pressable>
@@ -75,11 +78,14 @@ export default function OrgProfile() {
 }
 
 const s = StyleSheet.create({
-  head: { backgroundColor: C.navy, paddingHorizontal: 8 },
-  name: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  full: { color: '#C7D2E5' },
-  about: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, gap: 10 },
-  kv: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'flex-start' },
+  head: { backgroundColor: C.soft, borderRadius: R.xl, padding: SP.md, overflow: 'hidden', marginBottom: SP.lg, borderWidth: 1, borderColor: C.border },
+  ring: { position: 'absolute', top: -60, right: -50, width: 180, height: 180, borderRadius: 90, borderWidth: 26, borderColor: 'rgba(24,37,67,0.05)' },
+  back: { width: MIN_TAP, height: MIN_TAP, borderRadius: MIN_TAP / 2, backgroundColor: 'rgba(24,37,67,0.08)', alignItems: 'center', justifyContent: 'center' },
+  tabs: { ...CARD, padding: SP.xs },
+  name: { color: C.navy, fontSize: TYPE.h2, fontWeight: '700', fontFamily: SERIF, letterSpacing: -0.3 },
+  full: { color: C.muted, textAlign: 'center' },
+  about: { ...CARD, padding: SP.lg, gap: SP.md },
+  kv: { flexDirection: 'row', gap: SP.md, alignItems: 'center', justifyContent: 'flex-start' },
   k: { width: 90, color: C.muted, fontWeight: '700' },
   v: { color: C.text, flex: 1 },
 });

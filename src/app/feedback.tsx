@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { C, MIN_TAP } from '../lib/theme';
+import { C, MIN_TAP, PAD } from '../lib/theme';
 import { repo } from '../lib/repo';
 import { useStore } from '../lib/store';
-import { Button, Input, Screen, TopBar } from '../lib/ui';
+import { Button, Input, Label, Screen, TopBar } from '../lib/ui';
 
 // Open to guests. Feeds the usability evaluation.
 export default function Feedback() {
@@ -23,8 +23,8 @@ export default function Feedback() {
   return (
     <Screen edges={['top', 'bottom']}>
       <TopBar title="Send feedback" icon="close" />
-      <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
-        <Text style={{ fontWeight: '700', color: C.text, marginBottom: 8 }}>How easy was SagaySync to use?</Text>
+      <ScrollView contentContainerStyle={{ padding: PAD }} keyboardShouldPersistTaps="handled">
+        <Label>How easy was SagaySync to use?</Label>
         <View style={{ flexDirection: 'row', marginBottom: 20 }}>
           {[1, 2, 3, 4, 5].map((n) => (
             <Pressable key={n} accessibilityRole="button" accessibilityLabel={`${n} of 5`} onPress={() => setRating(n)} style={{ width: MIN_TAP + 8, height: MIN_TAP + 8, alignItems: 'center', justifyContent: 'center' }}>

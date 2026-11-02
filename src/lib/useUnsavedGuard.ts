@@ -12,7 +12,7 @@ export function useUnsavedGuard(dirty: boolean, saveDraft: () => Promise<boolean
   const allow = useRef(false);
   useEffect(
     () =>
-      nav.addListener('beforeRemove', (e: any) => {
+      nav.addListener('beforeRemove' as any, (e: any) => {
         if (allow.current || !dirty) return;
         e.preventDefault();
         const leave = () => { allow.current = true; nav.dispatch(e.data.action); };

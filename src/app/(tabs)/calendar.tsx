@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { C } from '../../lib/theme';
+import { C, CARD, PAD, PRESSED, R, SERIF, SP, TYPE } from '../../lib/theme';
 import { useStore } from '../../lib/store';
-import { Empty, FadeIn, Gate, IconButton, LinkButton, Screen, Segmented } from '../../lib/ui';
+import { Empty, FadeIn, Gate, IconButton, LinkButton, PageTitle, Screen, Segmented } from '../../lib/ui';
 import { EventRow } from '../../lib/cards';
 import { openEvent } from '../../lib/nav';
 import { DOW, MONTHS, cmpEvent, fmtFull, monthCells, pad, parseDate, toDateStr, todayStr } from '../../lib/date';
@@ -50,10 +50,11 @@ export default function CalendarTab() {
   return (
     <Screen>
       <Gate>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-          <Text style={s.h1}>Calendar</Text>
+        <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}>
+          <PageTitle>Calendar</PageTitle>
+          {header}
           <Segmented options={['Month', 'Agenda'] as const} value={view} onChange={setView} />
-          <View style={{ height: 14 }} />
+          <View style={{ height: SP.lg }} />
           {view === 'Month' ? Month() : Agenda()}
         </ScrollView>
       </Gate>
@@ -68,7 +69,6 @@ export default function CalendarTab() {
     return (
       <>
         <View style={s.card}>
-          {header}
           <View style={s.dow}>
             {DOW.map((d) => <Text key={d} style={s.dowT}>{d.toUpperCase()}</Text>)}
           </View>
@@ -79,12 +79,12 @@ export default function CalendarTab() {
               const isToday = c === today;
               const isHoliday = holidaysOn(c).some((h) => h.kind !== 'working');
               return (
-                <Pressable key={c} accessibilityRole="button" accessibilityLabel={fmtFull(c)} accessibilityState={{ selected }} style={s.cell} onPress={() => setSel(c)}>
-                  <View collapsable={false} style={[s.day, isHoliday && !selected && !isToday && s.holidayFill, selected && !isToday && s.selectedFill, isToday && s.today, selected && s.selected]}>
-                    <Text style={[s.dayT, (selected || isToday) && { fontWeight: '800' }, isHoliday && !isToday && { color: C.navy2, fontWeight: '800' }, isToday && { color: '#fff' }]}>
+                <Pressable key={c} accessibilityRole="button" accessibilityLabel={fmtFull(c)} accessibilityState={{ selected }} style={({ pressed }) => [s.cell, pressed && PRESSED]} onPress={() => setSel(c)}>
+                  <View collapsable={false} style={[s.day, isHoliday && s.holidayFill, isToday && s.today, selected && s.selected]}>
+                    <Text style={[s.dayT, (selected || isToday) && { fontWeight: '700' }, isHoliday && !isToday && { color: C.grayText, fontWeight: '700' }, isToday && { color: '#fff' }]}>
                       {parseDate(c).getDate()}
                     </Text>
-                    {byDate.has(c) ? <View style={[s.dot, selected && !isToday && { backgroundColor: C.navy }]} /> : null}
+                    {byDate.has(c) ? <View style={[s.dot, isToday && { backgroundColor: '#fff' }]} /> : null}
                   </View>
                 </Pressable>
               );
@@ -97,7 +97,7 @@ export default function CalendarTab() {
           <Text style={s.count}>{dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}</Text>
         </View>
         {dayHolidays.map((h) => <HolidayRow key={h.date + h.name} h={h} />)}
-        {dayEvents.length === 0 && dayHolidays.length === 0 ? <Empty text="No events on this day." /> : null}
+        {dayEvents.length === 0 && dayHolidays.length === 0 ? <Empty icon="calendar-outline" text="No events on this day." /> : null}
         {dayEvents.map((e, i) => (
           <FadeIn key={e.id} index={i}><EventRow e={e} org={orgById(e.orgId)} mode="time" onPress={() => openEvent(e.id)} /></FadeIn>
         ))}
@@ -113,11 +113,10 @@ export default function CalendarTab() {
     const dates = Array.from(new Set([...Object.keys(groups), ...monthHolidays.map((h) => h.date)])).sort();
     return (
       <>
-        <View style={[s.card, { paddingBottom: 4 }]}>{header}</View>
-        <View style={{ alignItems: 'flex-end', marginTop: 6 }}>
+        <View style={{ alignItems: 'flex-end' }}>
           <LinkButton title={past ? 'Hide past events' : 'Show past events'} onPress={() => setPast((p) => !p)} />
         </View>
-        {dates.length === 0 ? <Empty text={`No events scheduled for ${MONTHS[cur.m]}.`} /> : dates.map((d, gi) => {
+        {dates.length === 0 ? <Empty icon="calendar-outline" text={`No events scheduled for ${MONTHS[cur.m]}.`} /> : dates.map((d, gi) => {
           const dt = parseDate(d);
           return (
             <FadeIn key={d} index={gi}>
@@ -140,38 +139,34 @@ export default function CalendarTab() {
 }
 
 const s = StyleSheet.create({
-  h1: { fontSize: 28, fontWeight: '800', color: C.navy, marginBottom: 12 },
-  card: {
-    backgroundColor: '#fff', borderRadius: 24, padding: 12, borderWidth: 1, borderColor: C.border,
-    shadowColor: C.navy, shadowOpacity: 0.1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 4,
-  },
-  monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  monthT: { fontSize: 18, fontWeight: '800', color: C.navy },
-  dow: { flexDirection: 'row', backgroundColor: '#EEF1F8', borderRadius: 12, marginBottom: 6, paddingVertical: 8 },
-  dowT: { width: `${100 / 7}%`, textAlign: 'center', color: C.navy2, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+  // Same surface as every other card in the app.
+  card: { ...CARD, padding: 12 },
+  monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
+  monthT: { fontSize: TYPE.title, fontWeight: '700', color: C.navy, fontFamily: SERIF, letterSpacing: -0.2 },
+  dow: { flexDirection: 'row', marginBottom: SP.sm, paddingVertical: SP.xs },
+  dowT: { width: `${100 / 7}%`, textAlign: 'center', color: C.muted, fontWeight: '700', fontSize: TYPE.caption, letterSpacing: 0.5 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, height: 52, alignItems: 'center', justifyContent: 'center' },
   // Every day tile always has the same border + radius; only the border color changes.
   day: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 44, height: 44, borderRadius: R.md,
     borderWidth: 2, borderColor: 'transparent',
     overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
   },
   today: { backgroundColor: C.navy },
-  selected: { borderColor: C.yellow },
-  holidayFill: { backgroundColor: '#EEF1F8' },
-  selectedFill: { backgroundColor: '#FFF9E5' },
-  dayT: { fontWeight: '600', color: C.text, fontSize: 15 },
-  dot: { position: 'absolute', bottom: 3, width: 6, height: 6, borderRadius: 3, backgroundColor: C.yellow },
-  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22, marginBottom: 10, paddingHorizontal: 4 },
-  sel: { fontSize: 16, fontWeight: '800', color: C.text },
-  count: { color: C.muted, fontWeight: '600', fontSize: 12 },
-  holiday: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#EEF1F8', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#DCE3F0' },
-  holidayBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: C.navy2 },
-  holidayName: { fontSize: 16, fontWeight: '700', color: C.text },
-  holidayKind: { color: C.muted, fontSize: 12, marginTop: 2 },
-  agendaDate: { width: 52, alignItems: 'center', paddingTop: 10 },
-  big: { fontSize: 26, fontWeight: '800', color: C.navy },
-  wk: { fontSize: 11, fontWeight: '800', color: C.muted },
+  selected: { borderColor: C.navy },
+  holidayFill: { backgroundColor: C.soft },
+  dayT: { fontWeight: '600', color: C.text, fontSize: TYPE.body },
+  dot: { position: 'absolute', bottom: 3, width: 6, height: 6, borderRadius: 3, backgroundColor: C.navy2 },
+  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: SP.xxl, marginBottom: SP.md, paddingHorizontal: SP.xs },
+  sel: { fontSize: TYPE.title, fontWeight: '700', color: C.text, fontFamily: SERIF },
+  count: { color: C.muted, fontWeight: '600', fontSize: TYPE.caption },
+  holiday: { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: C.soft, borderRadius: R.lg, padding: SP.lg, marginBottom: SP.md, borderWidth: 1, borderColor: C.border },
+  holidayBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: C.muted },
+  holidayName: { fontSize: TYPE.body, fontWeight: '700', color: C.text, fontFamily: SERIF },
+  holidayKind: { color: C.muted, fontSize: TYPE.caption, marginTop: 2 },
+  agendaDate: { width: 52, alignItems: 'center', paddingTop: SP.md },
+  big: { fontSize: TYPE.h2, fontWeight: '700', color: C.navy, fontFamily: SERIF },
+  wk: { fontSize: TYPE.caption, fontWeight: '700', color: C.muted },
 });

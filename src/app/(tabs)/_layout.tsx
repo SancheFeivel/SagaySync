@@ -1,4 +1,5 @@
 import React from 'react';
+import { ColorValue } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +8,7 @@ import { useStore } from '../../lib/store';
 import { PlusButton } from '../../lib/PlusButton';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-const icon = (on: Icon, off: Icon) => ({ color, focused }: { color: string; focused: boolean }) =>
+const icon = (on: Icon, off: Icon) => ({ color, focused }: { color: ColorValue; focused: boolean }) =>
   <Ionicons name={focused ? on : off} size={24} color={color} />;
 
 export default function TabsLayout() {
@@ -34,7 +35,7 @@ export default function TabsLayout() {
             : { title: 'New', href: null }
         }
       />
-      <Tabs.Screen name="organizations" options={{ title: 'Organizations', tabBarIcon: icon('people', 'people-outline') }} />
+      <Tabs.Screen name="organizations" options={{ title: 'Groups', tabBarIcon: icon('people', 'people-outline') }} />
       <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('menu', 'menu-outline') }} />
     </Tabs>
   );

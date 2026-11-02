@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { C, MIN_TAP } from '../theme';
+import { C, CARD, ICON, MIN_TAP, PRESSED, R, SERIF, SP, TYPE } from '../theme';
 import { isLive, useStore } from '../store';
-import { Button, Empty, FadeIn, Gate, Pill, Screen, Tag } from '../ui';
+import { Eyebrow, Empty, FadeIn, Gate, Pill, Screen, Tag } from '../ui';
 import { MenuSheet, MenuItem } from '../MenuSheet';
 import { openAnnouncement, openEvent } from '../nav';
 import { Announcement, EventItem } from '../types';
@@ -67,15 +67,8 @@ export default function OfficerHome() {
 
   const header = (
     <View>
-      <View style={s.share}>
-        <Text style={s.shareT}>What are you sharing?</Text>
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-          <Button title="Announcement" icon="megaphone-outline" variant="yellow" style={{ flex: 1.6, paddingHorizontal: 12 }} onPress={() => router.push('/new-announcement')} />
-          <Button title="Event" icon="calendar-outline" variant="yellow" style={{ flex: 1, paddingHorizontal: 12 }} onPress={() => router.push('/new-event')} />
-        </View>
-      </View>
-      <Text style={s.section}>Your posts</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+      <Eyebrow>Your posts</Eyebrow>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20 }}>
         {FILTERS.map((f) => <Pill key={f} label={f} active={f === filter} onPress={() => setFilter(f)} />)}
       </ScrollView>
     </View>
@@ -84,16 +77,20 @@ export default function OfficerHome() {
   return (
     <Screen edges={[]}>
       <AppHeader
-        eyebrow="Officer"
-        right={<View style={s.chip}><Ionicons name="person-circle-outline" size={16} color={C.navy} /><Text style={s.chipT}>{org.name}</Text></View>}
+        right={<View style={s.chip}><Ionicons name="person-circle-outline" size={ICON.sm} color={C.navy} /><Text style={s.chipT}>{org.name}</Text></View>}
       />
       <Gate>
         <FlatList
           data={shown} keyExtractor={(it) => (it.kind === 'announcement' ? it.a.id : it.e.id)}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 32 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await refresh(); setRefreshing(false); }} tintColor={C.navy} />}
           ListHeaderComponent={header}
-          ListEmptyComponent={<Empty text="Nothing here yet." />}
+          ListEmptyComponent={
+            <Empty
+              icon="create-outline"
+              text={filter === 'All' ? 'Nothing here yet. Tap + below to post an announcement or event.' : filter === 'Drafts' ? 'No drafts.' : `No ${filter.toLowerCase()} posts.`}
+            />
+          }
           renderItem={({ item, index }) => {
             const { st, note } = statusOf(item);
             const title = item.kind === 'announcement' ? item.a.title : item.e.title;
@@ -101,19 +98,19 @@ export default function OfficerHome() {
             return (
               <FadeIn index={index}>
                 <Pressable
-                  accessibilityRole="button" style={s.post}
+                  accessibilityRole="button" accessibilityLabel={`${title}, ${st}`} style={({ pressed }) => [s.post, pressed && PRESSED]}
                   onPress={() => (item.kind === 'announcement' ? openAnnouncement(item.a.id) : openEvent(item.e.id))}
                 >
                   <View style={{ flex: 1, gap: 4 }}>
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <Tag label={item.kind === 'announcement' ? 'ANNOUNCEMENT' : 'EVENT'} tone="navy" />
+                    <View style={{ flexDirection: 'row', gap: SP.sm, alignItems: 'center' }}>
+                      <Ionicons name={item.kind === 'announcement' ? 'megaphone-outline' : 'calendar-outline'} size={ICON.md} color={C.navy2} />
                       <Tag label={st.toUpperCase()} tone={st === 'Published' ? 'green' : st === 'Scheduled' ? 'yellow' : 'gray'} />
                     </View>
                     <Text style={s.title}>{title}</Text>
                     {sub ? <Text style={s.sub}>{sub}</Text> : null}
                   </View>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Post options" hitSlop={4} onPress={() => setMenu(item)} style={s.more}>
-                    <Ionicons name="ellipsis-horizontal" size={22} color={C.muted} />
+                  <Pressable accessibilityRole="button" accessibilityLabel="Post options" hitSlop={4} onPress={() => setMenu(item)} style={({ pressed }) => [s.more, pressed && PRESSED]}>
+                    <Ionicons name="ellipsis-horizontal" size={ICON.lg} color={C.muted} />
                   </Pressable>
                 </Pressable>
               </FadeIn>
@@ -127,16 +124,10 @@ export default function OfficerHome() {
 }
 
 const s = StyleSheet.create({
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8 },
-  small: { color: C.muted, fontSize: 12, fontWeight: '600' },
-  wordmark: { fontSize: 26, fontWeight: '900', color: C.navy },
-  chip: { flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: C.yellow, paddingHorizontal: 12, minHeight: 36, borderRadius: 18 },
-  chipT: { fontWeight: '800', color: C.navy },
-  share: { backgroundColor: C.navy, borderRadius: 18, padding: 16, marginBottom: 18 },
-  shareT: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  section: { fontSize: 18, fontWeight: '800', color: C.text },
-  post: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  title: { fontSize: 16, fontWeight: '700', color: C.text },
-  sub: { color: C.muted, fontSize: 12 },
+  chip: { flexDirection: 'row', gap: SP.sm, alignItems: 'center', backgroundColor: C.soft, borderWidth: 1, borderColor: C.border, paddingHorizontal: SP.md, minHeight: 40, borderRadius: R.pill },
+  chipT: { fontWeight: '600', color: C.navy },
+  post: { ...CARD, padding: SP.lg, marginBottom: SP.md, flexDirection: 'row', alignItems: 'center' },
+  title: { fontSize: TYPE.title, fontWeight: '700', color: C.text, fontFamily: SERIF },
+  sub: { color: C.muted, fontSize: TYPE.caption },
   more: { width: MIN_TAP, height: MIN_TAP, alignItems: 'center', justifyContent: 'center' },
 });

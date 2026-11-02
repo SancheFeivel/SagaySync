@@ -2,16 +2,19 @@
 //   repo.fetchAll / signIn / signOut / saveAnnouncement / deleteAnnouncement / saveEvent / deleteEvent
 // Save the old mock as repo.mock.ts first, then put this at src/lib/repo.ts.
 import {
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -117,6 +120,68 @@ export const repo = {
 
   async signOut() {
     await fbSignOut(auth);
+  },
+
+  /** Emails a reset link. Never reveals whether the address belongs to an account. */
+  async sendReset(email: string) {
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (e: any) {
+      if (e?.code === "auth/user-not-found") return;
+      if (e?.code === "auth/network-request-failed") throw new OfflineError();
+      throw e;
+    }
+  },
+
+  /** Open to guests. Write-only: feedback is read in the Firebase Console. */
+  async sendFeedback(rating: number, comment: string) {
+    await guard(() =>
+      addDoc(collection(db, "feedback"), {
+        rating,
+        comment,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  },
+
+  /**
+   * One doc per device, keyed by its Expo push token, holding the groups it follows.
+   * Written by guests (no login), so it is deliberately small and self-describing.
+   */
+  async saveDevice(token: string, follows: string[], enabled: boolean) {
+    await guard(() =>
+      setDoc(doc(db, "devices", token), {
+        token,
+        follows,
+        enabled,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  },
+
+  /** Push tokens of devices following this group that still want alerts. Officers only. */
+  async tokensFollowing(orgId: string): Promise<string[]> {
+    return guard(async () => {
+      // array-contains alone uses the automatic index; `enabled` is filtered here to
+      // avoid needing a composite index deploy.
+      const snap = await getDocs(
+        query(
+          collection(db, "devices"),
+          where("follows", "array-contains", orgId),
+        ),
+      );
+      return snap.docs
+        .filter((d) => d.get("enabled") !== false)
+        .map((d) => d.get("token") as string)
+        .filter(Boolean);
+    });
+  },
+
+  /** Drops tokens Expo reported as dead, so the registry doesn't rot. */
+  async deleteDevices(tokens: string[]) {
+    await Promise.all(
+      tokens.map((t) => deleteDoc(doc(db, "devices", t)).catch(() => {})),
+    );
   },
 
   async saveAnnouncement(a: Announcement) {

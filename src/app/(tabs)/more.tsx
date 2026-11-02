@@ -1,21 +1,21 @@
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { C, MIN_TAP } from '../../lib/theme';
+import { C, CARD, ICON, MIN_TAP, PAD, PRESSED_ROW, SP, TYPE } from '../../lib/theme';
 import { useStore } from '../../lib/store';
-import { Screen } from '../../lib/ui';
+import { AppSwitch, PageTitle, Screen } from '../../lib/ui';
 
 type Icon = keyof typeof Ionicons.glyphMap;
 function Row({ icon, label, onPress, right, sub }: { icon: Icon; label: string; sub?: string; onPress?: () => void; right?: React.ReactNode }) {
   return (
-    <Pressable accessibilityRole="button" disabled={!onPress} onPress={onPress} style={s.row}>
-      <Ionicons name={icon} size={22} color={C.navy} />
+    <Pressable accessibilityRole="button" disabled={!onPress} onPress={onPress} style={({ pressed }) => [s.row, pressed && PRESSED_ROW]}>
+      <Ionicons name={icon} size={ICON.lg} color={C.navy} />
       <View style={{ flex: 1 }}>
         <Text style={s.label}>{label}</Text>
         {sub ? <Text style={s.sub}>{sub}</Text> : null}
       </View>
-      {right ?? (onPress ? <Ionicons name="chevron-forward" size={18} color={C.muted} /> : null)}
+      {right ?? (onPress ? <Ionicons name="chevron-forward" size={ICON.md} color={C.muted} /> : null)}
     </Pressable>
   );
 }
@@ -24,14 +24,14 @@ export default function MoreTab() {
   const { officer, signOut, notifOn, setNotifOn, orgById } = useStore();
   return (
     <Screen>
-      <View style={{ padding: 16 }}>
-        <Text style={s.h1}>More</Text>
+      <View style={{ padding: PAD }}>
+        <PageTitle>More</PageTitle>
         <View style={s.group}>
           <Row icon="information-circle-outline" label="About" onPress={() => router.push({ pathname: '/info', params: { kind: 'about' } })} />
           <Row icon="help-circle-outline" label="Help & FAQ" onPress={() => router.push({ pathname: '/info', params: { kind: 'help' } })} />
           <Row
             icon="notifications-outline" label="Notifications" sub="Push alerts for groups you follow"
-            right={<Switch value={notifOn} onValueChange={setNotifOn} trackColor={{ true: C.navy }} thumbColor={C.yellow} />}
+            right={<AppSwitch value={notifOn} onChange={setNotifOn} label="Notifications" />}
           />
           <Row icon="chatbubble-ellipses-outline" label="Send feedback" onPress={() => router.push('/feedback')} />
         </View>
@@ -48,9 +48,8 @@ export default function MoreTab() {
 }
 
 const s = StyleSheet.create({
-  h1: { fontSize: 28, fontWeight: '800', color: C.navy, marginBottom: 12 },
-  group: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  row: { minHeight: MIN_TAP + 12, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: C.border },
-  label: { fontSize: 16, fontWeight: '600', color: C.text },
-  sub: { color: C.muted, fontSize: 12, marginTop: 1 },
+  group: { ...CARD, overflow: 'hidden' },
+  row: { minHeight: MIN_TAP + 12, flexDirection: 'row', alignItems: 'center', gap: SP.lg, paddingHorizontal: SP.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: C.border },
+  label: { fontSize: TYPE.body, fontWeight: '600', color: C.text },
+  sub: { color: C.muted, fontSize: TYPE.caption, marginTop: 1 },
 });

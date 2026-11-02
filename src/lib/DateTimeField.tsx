@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { C, MIN_TAP } from './theme';
+import { C, FIELD, MIN_TAP, PRESSED } from './theme';
+import { Label } from './ui';
 import { fmtShort, fmtTime, toDateStr, toTimeStr } from './date';
 
 type Mode = 'date' | 'time' | 'datetime';
@@ -37,17 +38,17 @@ export function DateTimeField({ label, mode, value, onChange, placeholder, error
 
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontWeight: '700', color: C.text, marginBottom: 6 }}>{label}</Text>
+      <Label>{label}</Label>
       <Pressable
         accessibilityRole="button" accessibilityLabel={`${label}: ${text}`} onPress={press}
-        style={{ minHeight: MIN_TAP + 4, borderWidth: 1, borderColor: error ? C.danger : C.border, borderRadius: 12, backgroundColor: '#fff', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        style={({ pressed }) => [{ ...FIELD, borderColor: error ? C.danger : C.border, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, pressed && PRESSED]}
       >
         <Text style={{ fontSize: 16, color: value ? C.text : C.muted }}>{text}</Text>
         <Ionicons name={mode === 'time' ? 'time-outline' : 'calendar-outline'} size={20} color={C.muted} />
       </Pressable>
-      {error ? <Text style={{ color: C.danger, marginTop: 6 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: C.danger, marginTop: 8 }}>{error}</Text> : null}
       {Platform.OS === 'ios' && open ? (
-        <View style={{ backgroundColor: '#fff', borderRadius: 12, marginTop: 8 }}>
+        <View style={{ backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: C.border, marginTop: 8 }}>
           <DateTimePicker value={value ?? new Date()} mode={mode} display="spinner" onChange={(_, d) => d && onChange(d)} />
           <Pressable onPress={() => setOpen(false)} style={{ minHeight: MIN_TAP, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: C.navy2, fontWeight: '700' }}>Done</Text>

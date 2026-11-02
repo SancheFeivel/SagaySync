@@ -16,7 +16,6 @@ export type Announcement = {
   title: string;
   body: string;
   category: Category;
-  photo?: string;
   eventId?: string;
   pinned: boolean;
   status: PostStatus;

@@ -3,6 +3,8 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Announcement, Data, EventItem, Officer, Org } from './types';
 import { OfflineError, repo } from './repo';
+import { onNotificationTap, registerForPush, sendPush } from './push';
+import { openAnnouncement } from './nav';
 import { cmpEvent, todayStr } from './date';
 
 const K = { cache: 'ss:cache', follows: 'ss:follows', seen: 'ss:seen', notif: 'ss:notif', session: 'ss:session' };
@@ -55,6 +57,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [notifOn, setNotifOnState] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushToken = useRef<string | null>(null); // null in Expo Go, on emulators, or if denied
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setState((s) => (s.data ? s : { ...s, status: 'loading' }));
@@ -76,16 +79,30 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
+      let savedFollows: string[] = [];
+      let savedNotif = true;
       try {
         const [f, s, n, o] = await Promise.all([K.follows, K.seen, K.notif, K.session].map((k) => AsyncStorage.getItem(k)));
-        if (f) setFollows(JSON.parse(f));
+        if (f) { savedFollows = JSON.parse(f); setFollows(savedFollows); }
         if (s) setSeen(JSON.parse(s));
-        if (n) setNotifOnState(JSON.parse(n));
+        if (n) { savedNotif = JSON.parse(n); setNotifOnState(savedNotif); }
         if (o) setOfficer(JSON.parse(o)); // officers stay signed in until they log out
       } catch {}
       load();
+      // Register this device for push and record which groups it follows.
+      const token = await registerForPush();
+      pushToken.current = token;
+      if (token) repo.saveDevice(token, savedFollows, savedNotif).catch(() => {});
     })();
   }, [load]);
+
+  // Tapping an announcement notification opens that post.
+  useEffect(
+    () => onNotificationTap((d) => {
+      if (typeof d.announcementId === 'string') openAnnouncement(d.announcementId);
+    }),
+    [],
+  );
 
   const data = state.data;
   const orgs = data?.orgs ?? [];
@@ -114,18 +131,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const toggleFollow = useCallback((id: string) => {
-    setFollows((f) => {
-      const n = f.includes(id) ? f.filter((x) => x !== id) : [...f, id];
-      save(K.follows, n);
-      return n;
-    });
-    // TODO push: subscribe/unsubscribe this device to the org topic (needs a dev build, not Expo Go)
+  /** Keeps this device's row in the push registry in step with what it follows. */
+  const syncDevice = useCallback((nextFollows: string[], enabled: boolean) => {
+    const t = pushToken.current;
+    if (t) repo.saveDevice(t, nextFollows, enabled).catch(() => {});
   }, []);
+
+  const toggleFollow = useCallback((id: string) => {
+    const next = follows.includes(id) ? follows.filter((x) => x !== id) : [...follows, id];
+    setFollows(next);
+    save(K.follows, next);
+    syncDevice(next, notifOn);
+  }, [follows, notifOn, syncDevice]);
+
   const setNotifOn = useCallback((v: boolean) => {
     setNotifOnState(v);
     save(K.notif, v);
-  }, []);
+    // Turning it on for the first time is the moment to ask for permission.
+    if (v && !pushToken.current) {
+      registerForPush().then((t) => {
+        pushToken.current = t;
+        if (t) repo.saveDevice(t, follows, true).catch(() => {});
+      });
+    } else {
+      syncDevice(follows, v);
+    }
+  }, [follows, syncDevice]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const o = await repo.signIn(email, password);
@@ -143,6 +174,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2800);
   }, []);
+
+  /** Pushes a newly published announcement to everyone following that group. Never throws. */
+  const notifyFollowers = useCallback(
+    async (a: Announcement) => {
+      try {
+        const tokens = await repo.tokensFollowing(a.orgId);
+        const to = tokens.filter((t) => t !== pushToken.current); // don't buzz the poster's own phone
+        if (!to.length) return;
+        const dead = await sendPush(to, orgById(a.orgId).name, a.title, { announcementId: a.id });
+        if (dead.length) repo.deleteDevices(dead).catch(() => {});
+      } catch {
+        // A failed notification must never make a successful post look failed.
+      }
+    },
+    [orgById],
+  );
 
   const run = useCallback(
     async (fn: () => Promise<unknown>, okMsg?: string) => {
@@ -166,13 +213,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     officer, signIn, signOut,
     follows, toggleFollow, newCount, markSeen,
     notifOn, setNotifOn,
-    saveAnnouncement: (a, m) => run(() => repo.saveAnnouncement(a), m),
+    saveAnnouncement: async (a, m) => {
+      const before = announcements.find((x) => x.id === a.id);
+      const ok = await run(() => repo.saveAnnouncement(a), m);
+      // Notify only the first time a post actually goes live, never on a later edit.
+      if (ok && a.status === 'published' && before?.status !== 'published') notifyFollowers(a);
+      return ok;
+    },
     deleteAnnouncement: (id) => run(() => repo.deleteAnnouncement(id), 'Deleted.'),
-    saveEvent: (e, linked, m) =>
-      run(async () => {
+    saveEvent: async (e, linked, m) => {
+      const ok = await run(async () => {
         await repo.saveEvent(e);
         if (linked) await repo.saveAnnouncement(linked);
-      }, m),
+      }, m);
+      // "Also post an announcement" reaches the feed, so it should reach followers too.
+      if (ok && linked?.status === 'published') notifyFollowers(linked);
+      return ok;
+    },
     deleteEvent: (id) => run(() => repo.deleteEvent(id), 'Deleted.'),
     toast, showToast,
   };

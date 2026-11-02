@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   initializeAuth,
   getAuth,
+  // The React Native build exports this at runtime, but the default type definitions omit it.
+  // @ts-ignore
   getReactNativePersistence,
   type Auth,
 } from "firebase/auth";

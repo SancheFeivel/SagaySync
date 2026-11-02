@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { C } from '../lib/theme';
+import { C, FIELD, ICON, PAD, PRESSED, SERIF } from '../lib/theme';
 import { useStore } from '../lib/store';
 import { Empty, IconButton, Monogram, Screen, SectionTitle } from '../lib/ui';
 import { AnnouncementRow, EventRow } from '../lib/cards';
@@ -19,22 +19,24 @@ export default function Search() {
   const e = ready ? liveEvents.filter((x) => has(x.title, x.body, x.venue)) : [];
   const o = ready ? orgs.filter((x) => has(x.name, x.fullName, x.description)) : [];
   const none = ready && !a.length && !e.length && !o.length;
+  // Before the person types, show every group so there is something to tap.
+  const groups = ready ? o : orgs;
   return (
     <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: PAD }}>
         <IconButton name="chevron-back" label="Back" onPress={() => router.back()} />
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, minHeight: 48 }}>
-          <Ionicons name="search" size={18} color={C.muted} />
+        <View style={{ ...FIELD, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
+          <Ionicons name="search" size={ICON.md} color={C.muted} />
           <TextInput autoFocus value={q} onChangeText={setQ} placeholder="Search posts, events, groups" placeholderTextColor={C.muted} style={{ flex: 1, fontSize: 16, color: C.text }} returnKeyType="search" />
-          {q ? <Pressable accessibilityLabel="Clear" onPress={() => setQ('')} hitSlop={12}><Ionicons name="close-circle" size={18} color={C.muted} /></Pressable> : null}
+          {q ? <Pressable accessibilityLabel="Clear" onPress={() => setQ('')} hitSlop={12}><Ionicons name="close-circle" size={ICON.md} color={C.muted} /></Pressable> : null}
         </View>
       </View>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16 }}>
-        {!ready ? <Empty text="Type at least 2 letters." /> : none ? <Empty text={`No results for “${q.trim()}”.`} /> : null}
-        {o.length ? <SectionTitle>Groups</SectionTitle> : null}
-        {o.map((x) => (
-          <Pressable key={x.id} accessibilityRole="button" onPress={() => openOrg(x.id)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 56 }}>
-            <Monogram org={x} size={40} /><Text style={{ fontWeight: '700', color: C.text }}>{x.fullName}</Text>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: PAD }}>
+        {none ? <Empty icon="search-outline" text={`No results for “${q.trim()}”.`} /> : null}
+        {groups.length ? <SectionTitle>Groups</SectionTitle> : null}
+        {groups.map((x) => (
+          <Pressable key={x.id} accessibilityRole="button" onPress={() => openOrg(x.id)} style={({ pressed }) => [{ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 56 }, pressed && PRESSED]}>
+            <Monogram org={x} size={40} /><Text style={{ fontWeight: '700', color: C.text, fontFamily: SERIF, fontSize: 16 }}>{x.fullName}</Text>
           </Pressable>
         ))}
         {e.length ? <SectionTitle>Events</SectionTitle> : null}

@@ -2,14 +2,13 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { C } from '../../lib/theme';
+import { C, ICON, PAD, PRESSED, R, SERIF, TYPE } from '../../lib/theme';
 import { isLive, useStore } from '../../lib/store';
-import { Empty, Monogram, Screen, Tag, TopBar } from '../../lib/ui';
+import { Card, Empty, Monogram, Screen, SectionTitle, Tag, TopBar } from '../../lib/ui';
 import { AnnouncementRow } from '../../lib/cards';
 import { openAnnouncement, openOrg } from '../../lib/nav';
 import { fmtFull, fmtRange } from '../../lib/date';
 
-// Provisional design: Event Detail was listed as "not designed yet".
 export default function EventDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { events, announcements, orgById, officer } = useStore();
@@ -18,43 +17,50 @@ export default function EventDetail() {
   const ann = e?.announcementId ? announcements.find((a) => a.id === e.announcementId && isLive(a)) : undefined;
   const org = e ? orgById(e.orgId) : undefined;
   const Row = ({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) => (
-    <View style={s.row}><Ionicons name={icon} size={20} color={C.navy2} /><Text style={s.rowT}>{text}</Text></View>
+    <View style={s.row}><Ionicons name={icon} size={ICON.md} color={C.navy2} /><Text style={s.rowT}>{text}</Text></View>
   );
   return (
     <Screen>
       <TopBar title="Event" />
       {!e || !visible || !org ? <Empty text="This event is no longer available." /> : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
+        <ScrollView contentContainerStyle={{ padding: PAD, paddingTop: 8, paddingBottom: 40, gap: 12 }}>
           {e.tag !== 'none' ? (
-            <View style={[s.banner, { backgroundColor: e.tag === 'cancelled' ? '#FEE4E2' : '#FFF4D6' }]}>
-              <Text style={{ fontWeight: '800', color: e.tag === 'cancelled' ? C.danger : C.navy }}>
+            <View style={[s.banner, { backgroundColor: e.tag === 'cancelled' ? C.dangerSoft : C.warnSoft }]}>
+              <Text style={{ fontWeight: '700', color: e.tag === 'cancelled' ? C.danger : C.navy }}>
                 {e.tag === 'cancelled' ? 'This event was cancelled.' : 'This event was postponed.'}
               </Text>
             </View>
           ) : null}
           {e.status === 'draft' ? <Tag label="DRAFT" tone="gray" /> : null}
           <Text style={s.title}>{e.title}</Text>
-          <Row icon="calendar-outline" text={fmtFull(e.date)} />
-          <Row icon="time-outline" text={fmtRange(e.start, e.end)} />
-          {e.venue ? <Row icon="location-outline" text={e.venue} /> : null}
-          <Row icon="people-outline" text={e.audience} />
+          <Card style={{ gap: 12 }}>
+            <Row icon="calendar-outline" text={fmtFull(e.date)} />
+            <Row icon="time-outline" text={fmtRange(e.start, e.end)} />
+            {e.venue ? <Row icon="location-outline" text={e.venue} /> : null}
+            <Row icon="people-outline" text={e.audience} />
+          </Card>
           {e.body ? <Text style={s.body}>{e.body}</Text> : null}
-          <Pressable accessibilityRole="button" onPress={() => openOrg(org.id)} style={s.org}>
+          <Pressable accessibilityRole="button" onPress={() => openOrg(org.id)} style={({ pressed }) => [s.org, pressed && PRESSED]}>
             <Monogram org={org} size={40} />
-            <Text style={{ fontWeight: '800', color: C.text }}>Hosted by {org.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.hosted}>Hosted by</Text>
+              <Text style={s.orgName}>{org.name}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={ICON.md} color={C.muted} />
           </Pressable>
-          {ann ? (<><Text style={s.h}>Related announcement</Text><AnnouncementRow a={ann} org={org} onPress={() => openAnnouncement(ann.id)} /></>) : null}
+          {ann ? (<><SectionTitle>Related announcement</SectionTitle><AnnouncementRow a={ann} org={org} onPress={() => openAnnouncement(ann.id)} /></>) : null}
         </ScrollView>
       )}
     </Screen>
   );
 }
 const s = StyleSheet.create({
-  title: { fontSize: 26, fontWeight: '900', color: C.navy },
+  title: { fontSize: TYPE.h2, fontWeight: '700', color: C.navy, fontFamily: SERIF, letterSpacing: -0.3 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 32 },
-  rowT: { fontSize: 16, color: C.text, flex: 1 },
-  body: { fontSize: 16, lineHeight: 24, color: C.text, marginTop: 4 },
-  banner: { padding: 12, borderRadius: 12 },
-  org: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48, marginTop: 8 },
-  h: { fontSize: 16, fontWeight: '800', color: C.text, marginTop: 8 },
+  rowT: { fontSize: TYPE.body, color: C.text, flex: 1 },
+  body: { fontSize: TYPE.body, lineHeight: 24, color: C.text, marginTop: 4 },
+  banner: { padding: 12, borderRadius: R.md },
+  org: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48 },
+  hosted: { color: C.muted, fontSize: TYPE.caption },
+  orgName: { fontWeight: '700', color: C.text },
 });

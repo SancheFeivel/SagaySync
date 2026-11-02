@@ -1,10 +1,11 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { C } from '../../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { C, ICON, PAD, PRESSED, SERIF, TYPE } from '../../lib/theme';
 import { postTime, useStore } from '../../lib/store';
-import { Empty, Monogram, Screen, Tag, TopBar } from '../../lib/ui';
-import { EventRow, PhotoView } from '../../lib/cards';
+import { Empty, Monogram, Screen, SectionTitle, Tag, TopBar } from '../../lib/ui';
+import { EventRow } from '../../lib/cards';
 import { openEvent, openOrg } from '../../lib/nav';
 import { fmtStamp } from '../../lib/date';
 
@@ -20,23 +21,25 @@ export default function AnnouncementDetail() {
     <Screen>
       <TopBar title="Announcement" />
       {!a || !visible ? <Empty text="This post is no longer available." /> : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
-          <Pressable accessibilityRole="button" onPress={() => openOrg(a.orgId)} style={s.org}>
+        <ScrollView contentContainerStyle={{ padding: PAD, paddingTop: 8, paddingBottom: 40, gap: 12 }}>
+          <Pressable accessibilityRole="button" onPress={() => openOrg(a.orgId)} style={({ pressed }) => [s.org, pressed && PRESSED]}>
             <Monogram org={orgById(a.orgId)} size={40} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '800', color: C.text }}>{orgById(a.orgId).name}</Text>
-              <Text style={{ color: C.muted, fontSize: 12 }}>{fmtStamp(postTime(a))}</Text>
+              <Text style={{ fontWeight: '700', color: C.text }}>{orgById(a.orgId).name}</Text>
+              <Text style={{ color: C.muted, fontSize: TYPE.caption }}>{fmtStamp(postTime(a))}</Text>
             </View>
+            <Ionicons name="chevron-forward" size={ICON.md} color={C.muted} />
           </Pressable>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <Tag label={a.category.toUpperCase()} tone={a.category === 'Deadline' ? 'red' : 'navy'} />
-            {a.pinned ? <Tag label="PINNED" tone="yellow" /> : null}
-            {a.status !== 'published' ? <Tag label={a.status.toUpperCase()} tone="gray" /> : null}
-          </View>
+          {a.category !== 'Announcement' || a.pinned || a.status !== 'published' ? (
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {a.category !== 'Announcement' ? <Tag label={a.category.toUpperCase()} tone={a.category === 'Deadline' ? 'red' : 'gray'} /> : null}
+              {a.pinned ? <Tag label="PINNED" tone="yellow" /> : null}
+              {a.status !== 'published' ? <Tag label={a.status.toUpperCase()} tone="gray" /> : null}
+            </View>
+          ) : null}
           <Text style={s.title}>{a.title}</Text>
-          {a.photo ? <PhotoView uri={a.photo} /> : null}
           <Text style={s.body}>{a.body}</Text>
-          {ev ? (<><Text style={s.h}>Related event</Text><EventRow e={ev} org={orgById(ev.orgId)} mode="date" onPress={() => openEvent(ev.id)} /></>) : null}
+          {ev ? (<><SectionTitle>Related event</SectionTitle><EventRow e={ev} org={orgById(ev.orgId)} mode="date" onPress={() => openEvent(ev.id)} /></>) : null}
         </ScrollView>
       )}
     </Screen>
@@ -44,7 +47,6 @@ export default function AnnouncementDetail() {
 }
 const s = StyleSheet.create({
   org: { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 48 },
-  title: { fontSize: 24, fontWeight: '900', color: C.navy },
-  body: { fontSize: 16, lineHeight: 24, color: C.text },
-  h: { fontSize: 16, fontWeight: '800', color: C.text, marginTop: 8 },
+  title: { fontSize: TYPE.h2, fontWeight: '700', color: C.navy, fontFamily: SERIF, letterSpacing: -0.3 },
+  body: { fontSize: TYPE.body, lineHeight: 24, color: C.text },
 });

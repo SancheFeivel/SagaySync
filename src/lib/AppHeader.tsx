@@ -1,78 +1,49 @@
-import React, { ReactNode, useCallback } from 'react';
+import React, { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, MIN_TAP } from './theme';
+import { C, ICON, MIN_TAP, PRESSED, SERIF, SHADOW, TYPE } from './theme';
 
-type Props = { eyebrow: string; right?: ReactNode };
+type Props = { right?: ReactNode };
 
-/** Navy header with soft geometric depth. Extends under the status bar. */
-export function AppHeader({ eyebrow, right }: Props) {
+/** Light top bar: serif wordmark, school name underneath, optional action on the right. */
+export function AppHeader({ right }: Props) {
   const insets = useSafeAreaInsets();
-
-  // light status-bar icons only while this screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle('dark');
-    }, []),
-  );
-
   return (
-    <View style={[s.wrap, { paddingTop: insets.top + 10 }]}>
-      {/* decoration: kept low-contrast so it adds depth, not noise */}
-      <View pointerEvents="none" style={s.ringBig} />
-      <View pointerEvents="none" style={s.ringSmall} />
-      <View pointerEvents="none" style={s.dot} />
-
-      <View style={s.row}>
-        <View>
-          <Text style={s.eyebrow}>{eyebrow}</Text>
-          <Text style={s.wordmark}>
-            Sagay<Text style={{ color: C.yellow }}>Sync</Text>
-          </Text>
-        </View>
-        {right}
+    <View style={[s.wrap, { paddingTop: insets.top + 12 }]}>
+      <View>
+        <Text style={s.wordmark}>Sagay<Text style={{ color: C.navy2 }}>Sync</Text></Text>
+        <Text style={s.school}>Sagay National High School</Text>
       </View>
-      <View style={s.accent} />
+      {right}
     </View>
   );
 }
 
 export function HeaderIconButton({ name, label, onPress }: { name: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={s.iconBtn}>
-      <Ionicons name={name} size={22} color="#fff" />
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [s.iconBtn, pressed && PRESSED]}>
+      <Ionicons name={name} size={ICON.lg} color={C.navy} />
     </Pressable>
   );
 }
 
 const s = StyleSheet.create({
   wrap: {
-    backgroundColor: C.navy,
+    backgroundColor: '#fff',
+    ...SHADOW,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
     paddingHorizontal: 20,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eyebrow: { color: '#9FB3D1', fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
-  wordmark: { color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
-  iconBtn: {
-    width: MIN_TAP, height: MIN_TAP, borderRadius: MIN_TAP / 2,
-    backgroundColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center',
-  },
-  accent: { width: 28, height: 3, borderRadius: 2, backgroundColor: C.yellow, marginTop: 12 },
-  ringBig: {
-    position: 'absolute', top: -70, right: -50, width: 210, height: 210, borderRadius: 105,
-    borderWidth: 28, borderColor: 'rgba(255,255,255,0.045)',
-  },
-  ringSmall: {
-    position: 'absolute', bottom: -34, right: 70, width: 90, height: 90, borderRadius: 45,
-    borderWidth: 2, borderColor: 'rgba(255,199,44,0.22)',
-  },
-  dot: { position: 'absolute', top: 26, right: 96, width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,199,44,0.55)' },
+  wordmark: { color: C.navy, fontSize: TYPE.h3, fontWeight: '700', fontFamily: SERIF, letterSpacing: -0.3 },
+  school: { color: C.muted, fontSize: TYPE.caption, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 1 },
+  iconBtn: { width: MIN_TAP, height: MIN_TAP, borderRadius: MIN_TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: C.soft },
 });

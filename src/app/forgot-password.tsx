@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
-import { C } from '../lib/theme';
+import { C, PAD } from '../lib/theme';
 import { repo } from '../lib/repo';
 import { Button, Input, Screen, TopBar } from '../lib/ui';
 
@@ -16,7 +16,7 @@ export default function ForgotPassword() {
   return (
     <Screen edges={['top', 'bottom']}>
       <TopBar title="Reset password" />
-      <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: PAD }} keyboardShouldPersistTaps="handled">
         {sent ? (
           <Text style={{ color: C.text, fontSize: 16, lineHeight: 24 }}>
             If that email belongs to an officer account, a reset link is on its way. Check your inbox.

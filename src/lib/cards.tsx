@@ -1,10 +1,10 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { C, MIN_TAP } from './theme';
+import { C, CARD, ICON, MIN_TAP, PRESSED, R, SERIF, SP, TYPE } from './theme';
 import { Announcement, EventItem, Org } from './types';
 import { Monogram, Tag } from './ui';
-import { fmtRange, fmtStamp, fmtTime, MONTHS, parseDate, DOW } from './date';
+import { fmtFull, fmtRange, fmtStamp, fmtTime, MONTHS, parseDate, DOW } from './date';
 import { postTime } from './store';
 
 export function EventTagView({ e }: { e: EventItem }) {
@@ -13,17 +13,24 @@ export function EventTagView({ e }: { e: EventItem }) {
   return null;
 }
 
+/** What a screen reader says for an event card or row, instead of reading every tag and icon. */
+const eventLabel = (e: EventItem, org: Org) =>
+  `${e.tag !== 'none' ? `${e.tag}: ` : ''}${e.title}, ${fmtFull(e.date)}, ${fmtRange(e.start, e.end)}, ${org.name}`;
+
 export function AnnouncementRow({ a, org, onPress }: { a: Announcement; org: Org; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={s.card}>
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-        <Monogram org={org} size={32} />
+    <Pressable
+      accessibilityRole="button" accessibilityLabel={`${a.category !== 'Announcement' ? `${a.category}: ` : ''}${a.title}, ${org.name}`}
+      onPress={onPress} style={({ pressed }) => [s.card, pressed && PRESSED]}
+    >
+      <View style={{ flexDirection: 'row', gap: SP.md, alignItems: 'center', marginBottom: SP.sm }}>
+        <Monogram org={org} size={44} />
         <View style={{ flex: 1 }}>
           <Text style={s.org}>{org.name}</Text>
           <Text style={s.meta}>{fmtStamp(postTime(a))}</Text>
         </View>
         {a.pinned ? <Ionicons name="pin" size={16} color={C.muted} /> : null}
-        <Tag label={a.category.toUpperCase()} tone={a.category === 'Deadline' ? 'red' : 'gray'} />
+        {a.category !== 'Announcement' ? <Tag label={a.category.toUpperCase()} tone={a.category === 'Deadline' ? 'red' : 'gray'} /> : null}
       </View>
       <Text style={s.title}>{a.title}</Text>
       <Text style={s.body} numberOfLines={2}>{a.body}</Text>
@@ -35,7 +42,7 @@ export function AnnouncementRow({ a, org, onPress }: { a: Announcement; org: Org
 export function EventCard({ e, org, next, onPress }: { e: EventItem; org: Org; next?: boolean; onPress: () => void }) {
   const d = parseDate(e.date);
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={[s.card, { width: 230, marginRight: 12, minHeight: 130 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={eventLabel(e, org)} onPress={onPress} style={({ pressed }) => [s.card, { width: 230, marginRight: 12, minHeight: 130 }, next && { borderColor: C.navy, borderWidth: 2 }, pressed && PRESSED]}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={s.dateBox}>
           <Text style={s.dateMon}>{MONTHS[d.getMonth()].slice(0, 3).toUpperCase()}</Text>
@@ -46,7 +53,7 @@ export function EventCard({ e, org, next, onPress }: { e: EventItem; org: Org; n
           <EventTagView e={e} />
         </View>
       </View>
-      <Text style={[s.title, { marginTop: 10 }]} numberOfLines={2}>{e.title}</Text>
+      <Text style={[s.title, { marginTop: SP.md }]} numberOfLines={2}>{e.title}</Text>
       <Text style={s.meta}>{org.name} · {fmtTime(e.start)}</Text>
     </Pressable>
   );
@@ -55,8 +62,26 @@ export function EventCard({ e, org, next, onPress }: { e: EventItem; org: Org; n
 /** Row in a list of events. `date` mode leads with a big day number, `time` mode with the start time. */
 export function EventRow({ e, org, mode, next, onPress }: { e: EventItem; org: Org; mode: 'date' | 'time'; next?: boolean; onPress: () => void }) {
   const d = parseDate(e.date);
+  // Calendar day view: same shape as a holiday card (bar, serif title, one meta line).
+  if (mode === 'time') {
+    return (
+      <Pressable accessibilityRole="button" accessibilityLabel={eventLabel(e, org)} onPress={onPress} style={({ pressed }) => [s.line, pressed && PRESSED]}>
+        <View style={s.lineBar} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.lineTitle}>{e.title}</Text>
+          <Text style={[s.meta, { marginTop: 2 }]}>{fmtRange(e.start, e.end)} · {org.name}</Text>
+          {next || e.tag !== 'none' ? (
+            <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm }}>
+              {next ? <Tag label="NEXT" tone="yellow" /> : null}
+              <EventTagView e={e} />
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    );
+  }
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={[s.card, { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: MIN_TAP + 20 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={eventLabel(e, org)} onPress={onPress} style={({ pressed }) => [s.card, { flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: MIN_TAP + 20 }, pressed && PRESSED]}>
       {mode === 'date' ? (
         <View style={s.dateBox}>
           <Text style={s.dateMon}>{MONTHS[d.getMonth()].slice(0, 3).toUpperCase()}</Text>
@@ -64,35 +89,35 @@ export function EventRow({ e, org, mode, next, onPress }: { e: EventItem; org: O
         </View>
       ) : (
         <View style={{ width: 64 }}>
-          <Text style={{ fontWeight: '800', color: C.navy }}>{fmtTime(e.start)}</Text>
+          <Text style={{ fontWeight: '700', color: C.navy }}>{fmtTime(e.start)}</Text>
         </View>
       )}
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: SP.xs }}>
         <Text style={s.title}>{e.title}</Text>
         <Text style={s.meta}>
           {mode === 'date' ? `${DOW[d.getDay()]} · ${fmtRange(e.start, e.end)}` : e.end ? `until ${fmtTime(e.end)}` : e.venue || ' '} · {org.name}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+        <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.xs }}>
           {next ? <Tag label="NEXT" tone="yellow" /> : null}
           <EventTagView e={e} />
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={C.muted} />
+      <Ionicons name="chevron-forward" size={ICON.md} color={C.muted} />
     </Pressable>
   );
 }
 
-export function PhotoView({ uri }: { uri: string }) {
-  return <Image source={{ uri }} style={{ width: '100%', height: 200, borderRadius: 12, backgroundColor: C.border }} resizeMode="cover" />;
-}
-
 const s = StyleSheet.create({
-  card: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  card: { ...CARD, padding: SP.lg, marginBottom: SP.md },
   org: { fontWeight: '700', color: C.text },
-  meta: { color: C.muted, fontSize: 12 },
-  title: { fontSize: 16, fontWeight: '700', color: C.text },
-  body: { color: C.muted, marginTop: 4, lineHeight: 20 },
-  dateBox: { width: 52, height: 56, borderRadius: 12, backgroundColor: C.navy, alignItems: 'center', justifyContent: 'center' },
-  dateMon: { color: C.yellow, fontSize: 10, fontWeight: '800' },
-  dateNum: { color: '#fff', fontSize: 22, fontWeight: '800', lineHeight: 26 },
+  meta: { color: C.muted, fontSize: TYPE.caption },
+  line: { ...CARD, flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.lg, marginBottom: SP.md },
+  lineBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: C.navy },
+  lineTitle: { fontSize: TYPE.body, fontWeight: '700', color: C.text, fontFamily: SERIF },
+  title: { fontSize: TYPE.title, fontWeight: '700', color: C.text, fontFamily: SERIF },
+  body: { color: C.muted, marginTop: SP.sm, lineHeight: 24 },
+  // Soft badge, same as the group monograms.
+  dateBox: { width: 54, height: 58, borderRadius: R.md, backgroundColor: C.soft, alignItems: 'center', justifyContent: 'center' },
+  dateMon: { color: C.navy2, fontSize: TYPE.caption, fontWeight: '700', letterSpacing: 1.2 },
+  dateNum: { color: C.navy, fontSize: TYPE.h3, fontWeight: '700', lineHeight: 26, fontFamily: SERIF },
 });

@@ -33,6 +33,31 @@ service cloud.firestore {
       allow delete: if isOfficer() && resource.data.orgId == officerOrg();
     }
 
+    // Anyone (guests included) can send feedback. Nobody can read it from the app; use the Console.
+    match /feedback/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['rating', 'comment', 'createdAt'])
+                    && request.resource.data.rating is int
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() <= 1000
+                    && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
+    // One doc per device, keyed by its Expo push token, listing the groups it follows.
+    // Students are guests, so writes are open: a push token is not a secret and the doc
+    // holds nothing personal. Only officers can read the list, to send announcements to it.
+    match /devices/{token} {
+      allow read, delete: if isOfficer();
+      allow create, update: if request.resource.data.keys().hasOnly(['token', 'follows', 'enabled', 'updatedAt'])
+                    && request.resource.data.token == token
+                    && request.resource.data.follows is list
+                    && request.resource.data.follows.size() <= 25
+                    && request.resource.data.enabled is bool
+                    && request.resource.data.updatedAt == request.time;
+    }
+
     // Create these by hand in the Console: officers/{uid} -> { email, orgId }
     match /officers/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
