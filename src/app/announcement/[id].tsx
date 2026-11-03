@@ -12,10 +12,10 @@ import { fmtStamp } from '../../lib/date';
 // Provisional design: Announcement Detail was listed as "not designed yet".
 export default function AnnouncementDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { announcements, events, orgById, officer } = useStore();
+  const { announcements, events, orgById, officer, admin } = useStore();
   const a = announcements.find((x) => x.id === id);
-  // students only see live posts; officers can open their own group's drafts/scheduled
-  const visible = a && (a.status === 'published' || (a.status === 'scheduled' && postTime(a) <= new Date().toISOString()) || officer?.orgId === a.orgId);
+  // students only see live posts; officers can open their own group's drafts/scheduled; admins can open any
+  const visible = a && (a.status === 'published' || (a.status === 'scheduled' && postTime(a) <= new Date().toISOString()) || officer?.orgId === a.orgId || !!admin);
   const ev = a?.eventId ? events.find((e) => e.id === a.eventId && e.status === 'published') : undefined;
   return (
     <Screen>

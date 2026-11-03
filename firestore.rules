@@ -2,35 +2,142 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isOfficer() {
+    // ---------- Roles ----------
+    // Three tiers: guests (students, no login), officers (post for one group), admins (school-wide).
+
+    // Admins are made by hand in the Console: admins/{uid} -> { email }. The app can never create one.
+    function isAdmin() {
       return request.auth != null &&
-        exists(/databases/$(database)/documents/officers/$(request.auth.uid));
-    }
-    function officerOrg() {
-      return get(/databases/$(database)/documents/officers/$(request.auth.uid)).data.orgId;
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function officerDoc() {
+      return get(/databases/$(database)/documents/officers/$(request.auth.uid)).data;
+    }
+    // An officer an admin switched off (active == false) loses posting rights at once.
+    // Records made before the admin role existed have no `active` field and count as on.
+    function isOfficer() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/officers/$(request.auth.uid)) &&
+        officerDoc().get('active', true) == true;
+    }
+    function officerOrg() {
+      return officerDoc().orgId;
+    }
+    // Admins may post for any group; officers only for their own.
+    function canPostFor(orgId) {
+      return isAdmin() || (isOfficer() && officerOrg() == orgId);
+    }
+
+    // Group ids a device may follow. Admins keep meta/groups in step when they add or remove a
+    // group; until that doc exists, the original four groups are used.
+    function groupIds() {
+      return exists(/databases/$(database)/documents/meta/groups)
+        ? get(/databases/$(database)/documents/meta/groups).data.ids
+        : ['sslg', 'ang-sigay', 'the-shell', 'spc'];
+    }
+
+    // ---------- Shape checks ----------
+
+    // Optional string field: absent, or a string no longer than `max`.
+    function optString(d, k, max) {
+      return !(k in d) || (d[k] is string && d[k].size() <= max);
+    }
+
+    function validAnnouncement(d) {
+      return d.keys().hasOnly(['id', 'orgId', 'title', 'body', 'category', 'eventId',
+                               'pinned', 'status', 'createdAt', 'publishAt'])
+        && d.title is string && d.title.size() <= 150
+        && d.body is string && d.body.size() <= 5000
+        && d.category in ['Announcement', 'Reminder', 'Deadline']
+        && d.pinned is bool
+        && d.status in ['published', 'scheduled', 'draft']
+        && d.createdAt is string && d.createdAt.size() <= 40
+        && optString(d, 'eventId', 64)
+        // Only scheduled posts carry publishAt, and it must be a Timestamp so the
+        // read rule below can compare it to the server clock.
+        && (d.status == 'scheduled' ? d.publishAt is timestamp : !('publishAt' in d));
+    }
+
+    function validEvent(d) {
+      return d.keys().hasOnly(['id', 'orgId', 'title', 'date', 'start', 'end', 'venue',
+                               'audience', 'body', 'status', 'tag', 'createdAt', 'announcementId'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 150
+        && d.body is string && d.body.size() <= 5000
+        && d.venue is string && d.venue.size() <= 200
+        && d.date is string && d.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.start is string && d.start.matches('[0-9]{2}:[0-9]{2}')
+        && (!('end' in d) || (d.end is string && d.end.matches('[0-9]{2}:[0-9]{2}')))
+        && d.audience in ['All students', 'Members']
+        && d.status in ['published', 'draft']
+        && d.tag in ['none', 'cancelled', 'postponed']
+        && d.createdAt is string && d.createdAt.size() <= 40
+        && optString(d, 'announcementId', 64);
+    }
+
+    function validOrg(d) {
+      return d.keys().hasOnly(['name', 'fullName', 'description', 'adviser', 'president', 'office', 'facebook'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+        && d.fullName is string && d.fullName.size() <= 120
+        && d.description is string && d.description.size() <= 1000
+        && d.adviser is string && d.adviser.size() <= 100
+        && d.president is string && d.president.size() <= 100
+        && d.office is string && d.office.size() <= 100
+        && d.facebook is string && d.facebook.size() <= 300;
+    }
+
+    // The group must really exist, so an officer can never be tied to a mistyped org id.
+    function validOfficer(d) {
+      return d.keys().hasOnly(['email', 'orgId', 'active', 'addedBy'])
+        && d.email is string && d.email.size() <= 200
+        && d.orgId is string
+        && exists(/databases/$(database)/documents/orgs/$(d.orgId))
+        && (!('active' in d) || d.active is bool)
+        && optString(d, 'addedBy', 128);
+    }
+
+    // ---------- Collections ----------
+
+    // Admins add, edit and remove groups. The app deletes a group's posts, events and officer
+    // records in the same batch, so nothing is left pointing at a group that is gone.
     match /orgs/{id} {
       allow read: if true;
-      allow write: if false;
+      allow create, update: if isAdmin() && id.matches('[a-z0-9-]{2,32}') && validOrg(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /meta/groups {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['ids'])
+        && request.resource.data.ids is list
+        && request.resource.data.ids.size() <= 50;
     }
 
     match /announcements/{id} {
-      allow read: if resource.data.status in ['published', 'scheduled']
+      // Scheduled posts stay hidden from guests until the server clock passes publishAt.
+      allow read: if resource.data.status == 'published'
+                  || (resource.data.status == 'scheduled' && resource.data.publishAt <= request.time)
+                  || isAdmin()
                   || (isOfficer() && resource.data.orgId == officerOrg());
-      allow create: if isOfficer() && request.resource.data.orgId == officerOrg();
-      allow update: if isOfficer() && resource.data.orgId == officerOrg()
-                    && request.resource.data.orgId == officerOrg();
-      allow delete: if isOfficer() && resource.data.orgId == officerOrg();
+      allow create: if canPostFor(request.resource.data.orgId)
+                    && validAnnouncement(request.resource.data);
+      allow update: if canPostFor(resource.data.orgId)
+                    && canPostFor(request.resource.data.orgId)
+                    && validAnnouncement(request.resource.data);
+      allow delete: if canPostFor(resource.data.orgId);
     }
 
     match /events/{id} {
       allow read: if resource.data.status == 'published'
+                  || isAdmin()
                   || (isOfficer() && resource.data.orgId == officerOrg());
-      allow create: if isOfficer() && request.resource.data.orgId == officerOrg();
-      allow update: if isOfficer() && resource.data.orgId == officerOrg()
-                    && request.resource.data.orgId == officerOrg();
-      allow delete: if isOfficer() && resource.data.orgId == officerOrg();
+      allow create: if canPostFor(request.resource.data.orgId)
+                    && validEvent(request.resource.data);
+      allow update: if canPostFor(resource.data.orgId)
+                    && canPostFor(request.resource.data.orgId)
+                    && validEvent(request.resource.data);
+      allow delete: if canPostFor(resource.data.orgId);
     }
 
     // Anyone (guests included) can send feedback. Nobody can read it from the app; use the Console.
@@ -46,20 +153,29 @@ service cloud.firestore {
     }
 
     // One doc per device, keyed by its Expo push token, listing the groups it follows.
-    // Students are guests, so writes are open: a push token is not a secret and the doc
-    // holds nothing personal. Only officers can read the list, to send announcements to it.
+    // Students are guests, so writes are open, but the doc id must look like a real
+    // Expo token and `follows` may only name real groups.
     match /devices/{token} {
-      allow read, delete: if isOfficer();
-      allow create, update: if request.resource.data.keys().hasOnly(['token', 'follows', 'enabled', 'updatedAt'])
+      allow read, delete: if isOfficer() || isAdmin();
+      allow create, update: if token.matches('ExponentPushToken\\[[A-Za-z0-9_-]+\\]')
+                    && request.resource.data.keys().hasOnly(['token', 'follows', 'enabled', 'updatedAt'])
                     && request.resource.data.token == token
                     && request.resource.data.follows is list
                     && request.resource.data.follows.size() <= 25
+                    && request.resource.data.follows.hasOnly(groupIds())
                     && request.resource.data.enabled is bool
                     && request.resource.data.updatedAt == request.time;
     }
 
-    // Create these by hand in the Console: officers/{uid} -> { email, orgId }
+    // officers/{uid} -> { email, orgId, active, addedBy }. Admins manage these from the app.
     match /officers/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAdmin() && validOfficer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // admins/{uid} -> { email }. Console only, so a stolen admin login can't make more admins.
+    match /admins/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }

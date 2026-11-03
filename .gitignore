@@ -64,3 +64,6 @@ firebase-debug.log*
 credentials.json
 
 serviceAccountKey.json
+
+# files waiting to be deleted by hand
+_to_delete/

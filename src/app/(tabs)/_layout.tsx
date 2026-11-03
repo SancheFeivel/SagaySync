@@ -8,11 +8,16 @@ import { useStore } from '../../lib/store';
 import { PlusButton } from '../../lib/PlusButton';
 
 type Icon = keyof typeof Ionicons.glyphMap;
-const icon = (on: Icon, off: Icon) => ({ color, focused }: { color: ColorValue; focused: boolean }) =>
-  <Ionicons name={focused ? on : off} size={24} color={color} />;
+const icon = (on: Icon, off: Icon) => {
+  // Tabs passes a ColorValue (which may be null); Ionicons only takes a string here.
+  const TabIcon = ({ color, focused }: { color: ColorValue; focused: boolean }) =>
+    <Ionicons name={focused ? on : off} size={24} color={typeof color === 'string' ? color : undefined} />;
+  return TabIcon;
+};
 
 export default function TabsLayout() {
-  const { officer } = useStore();
+  const { officer, admin } = useStore();
+  const staff = !!officer || !!admin;
   const insets = useSafeAreaInsets();
   return (
     <Tabs
@@ -26,11 +31,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home', 'home-outline') }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar', 'calendar-outline') }} />
-      {/* Officers get an extra "+" in the middle. Hidden for students. */}
+      {/* Officers and admins get an extra "+" in the middle. Hidden for students. */}
       <Tabs.Screen
         name="new"
         options={
-          officer
+          staff
             ? { title: 'New', tabBarButton: () => <PlusButton /> }
             : { title: 'New', href: null }
         }

@@ -21,7 +21,7 @@ function Row({ icon, label, onPress, right, sub }: { icon: Icon; label: string; 
 }
 
 export default function MoreTab() {
-  const { officer, signOut, notifOn, setNotifOn, orgById } = useStore();
+  const { officer, admin, signOut, notifOn, setNotifOn, orgById } = useStore();
   return (
     <Screen>
       <View style={{ padding: PAD }}>
@@ -35,11 +35,19 @@ export default function MoreTab() {
           />
           <Row icon="chatbubble-ellipses-outline" label="Send feedback" onPress={() => router.push('/feedback')} />
         </View>
+        {admin ? (
+          <View style={[s.group, { marginTop: 16 }]}>
+            <Row icon="people-outline" label="Manage groups" sub="Add, edit or remove groups" onPress={() => router.push('/admin/groups')} />
+            <Row icon="key-outline" label="Manage officers" sub="Add officers, move or switch them off" onPress={() => router.push('/admin/officers')} />
+          </View>
+        ) : null}
         <View style={[s.group, { marginTop: 16 }]}>
-          {officer ? (
+          {admin ? (
+            <Row icon="log-out-outline" label="Log out" sub={`Signed in as admin · ${admin.email}`} onPress={signOut} />
+          ) : officer ? (
             <Row icon="log-out-outline" label="Log out" sub={`Signed in as ${orgById(officer.orgId).name} officer`} onPress={signOut} />
           ) : (
-            <Row icon="lock-closed-outline" label="Officer login" onPress={() => router.push('/login')} />
+            <Row icon="lock-closed-outline" label="Officer / admin login" onPress={() => router.push('/login')} />
           )}
         </View>
       </View>

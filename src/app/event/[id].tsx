@@ -9,16 +9,19 @@ import { AnnouncementRow } from '../../lib/cards';
 import { openAnnouncement, openOrg } from '../../lib/nav';
 import { fmtFull, fmtRange } from '../../lib/date';
 
-export default function EventDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { events, announcements, orgById, officer } = useStore();
-  const e = events.find((x) => x.id === id);
-  const visible = e && (e.status === 'published' || officer?.orgId === e.orgId);
-  const ann = e?.announcementId ? announcements.find((a) => a.id === e.announcementId && isLive(a)) : undefined;
-  const org = e ? orgById(e.orgId) : undefined;
-  const Row = ({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) => (
+function Row({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  return (
     <View style={s.row}><Ionicons name={icon} size={ICON.md} color={C.navy2} /><Text style={s.rowT}>{text}</Text></View>
   );
+}
+
+export default function EventDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { events, announcements, orgById, officer, admin } = useStore();
+  const e = events.find((x) => x.id === id);
+  const visible = e && (e.status === 'published' || officer?.orgId === e.orgId || !!admin);
+  const ann = e?.announcementId ? announcements.find((a) => a.id === e.announcementId && isLive(a)) : undefined;
+  const org = e ? orgById(e.orgId) : undefined;
   return (
     <Screen>
       <TopBar title="Event" />

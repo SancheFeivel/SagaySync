@@ -66,10 +66,13 @@ export default function OrgProfile() {
             {([['Adviser', org.adviser], ['President', org.president], ['Office', org.office]] as const).map(([k, v]) => (
               <View key={k} style={s.kv}><Text style={s.k}>{k}</Text><Text style={s.v}>{v}</Text></View>
             ))}
-            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(org.facebook)} style={({ pressed }) => [s.kv, { minHeight: 48 }, pressed && PRESSED]}>
-              <Ionicons name="logo-facebook" size={20} color={C.navy2} />
-              <Text style={{ color: C.navy2, fontWeight: '700' }}>Facebook page</Text>
-            </Pressable>
+            {/* Admins can leave the link empty when a group has no page. */}
+            {org.facebook ? (
+              <Pressable accessibilityRole="link" onPress={() => Linking.openURL(org.facebook)} style={({ pressed }) => [s.kv, { minHeight: 48 }, pressed && PRESSED]}>
+                <Ionicons name="logo-facebook" size={20} color={C.navy2} />
+                <Text style={{ color: C.navy2, fontWeight: '700' }}>Facebook page</Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
       </ScrollView>

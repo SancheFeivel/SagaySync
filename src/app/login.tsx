@@ -18,7 +18,7 @@ export default function Login() {
     setBusy(true); setErr('');
     try {
       await signIn(email, pw);
-      router.replace('/'); // lands on Officer Home
+      router.replace('/'); // lands on Officer Home or Admin Home
     } catch {
       setErr('Incorrect email or password'); // never says which one was wrong
     } finally { setBusy(false); }
@@ -29,7 +29,7 @@ export default function Login() {
       <TopBar title="" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: PAD }} keyboardShouldPersistTaps="handled">
-          <PageTitle style={{ marginBottom: SP.xl }}>Officer login</PageTitle>
+          <PageTitle style={{ marginBottom: SP.xl }}>Log in</PageTitle>
           <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="you@example.com" />
           <Input
             label="Password" value={pw} onChangeText={setPw} secureTextEntry={!show} autoCapitalize="none" placeholder="Password" error={err}
@@ -48,7 +48,7 @@ export default function Login() {
             <LinkButton title="Continue as guest" onPress={() => router.replace('/')} />
           </View>
           <Text style={{ color: C.muted, textAlign: 'center', marginTop: SP.lg, fontSize: 12 }}>
-            Accounts are created for authorized officers only. There is no sign-up.
+            Accounts are made for group officers and school admins only. There is no sign-up.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

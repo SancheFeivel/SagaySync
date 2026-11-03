@@ -16,6 +16,8 @@ export default function RootLayout() {
           <Stack.Screen name="new-announcement" options={{ presentation: 'modal' }} />
           <Stack.Screen name="new-event" options={{ presentation: 'modal' }} />
           <Stack.Screen name="feedback" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="admin/group-edit" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="admin/officer-new" options={{ presentation: 'modal' }} />
         </Stack>
         <Toast />
       </StoreProvider>

@@ -40,4 +40,8 @@ export type EventItem = {
   announcementId?: string;
 };
 export type Officer = { email: string; orgId: string };
+/** School-level account. Made by hand in the Firebase Console: admins/{uid}. */
+export type Admin = { email: string; uid: string };
+/** officers/{uid} as the admin screens see it. `active: false` = access switched off. */
+export type OfficerRecord = { uid: string; email: string; orgId: string; active: boolean };
 export type Data = { orgs: Org[]; announcements: Announcement[]; events: EventItem[] };

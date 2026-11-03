@@ -1,13 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Announcement, Data, EventItem, Officer, Org } from './types';
-import { OfflineError, repo } from './repo';
+import { Admin, Announcement, Data, EventItem, Officer, Org } from './types';
+import { OfflineError, repo, Session } from './repo';
 import { onNotificationTap, registerForPush, sendPush } from './push';
 import { openAnnouncement } from './nav';
 import { cmpEvent, todayStr } from './date';
 
-const K = { cache: 'ss:cache', follows: 'ss:follows', seen: 'ss:seen', notif: 'ss:notif', session: 'ss:session' };
+const K = { cache: 'ss:cache', follows: 'ss:follows', seen: 'ss:seen', notif: 'ss:notif', session: 'ss:session', admin: 'ss:admin' };
 const save = (k: string, v: unknown) => AsyncStorage.setItem(k, JSON.stringify(v)).catch(() => {});
 
 type Status = 'loading' | 'ready' | 'error' | 'nocache';
@@ -29,6 +29,7 @@ type Store = {
   upcoming: EventItem[]; // published, today onward
   orgById: (id: string) => Org;
   officer: Officer | null;
+  admin: Admin | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   follows: string[];
@@ -41,6 +42,8 @@ type Store = {
   deleteAnnouncement: (id: string) => Promise<boolean>;
   saveEvent: (e: EventItem, linked?: Announcement, okMsg?: string) => Promise<boolean>;
   deleteEvent: (id: string) => Promise<boolean>;
+  saveOrg: (o: Org, okMsg?: string) => Promise<boolean>;
+  deleteOrg: (id: string) => Promise<boolean>;
   toast: string | null;
   showToast: (m: string) => void;
 };
@@ -52,6 +55,7 @@ const UNKNOWN: Org = { id: '?', name: 'Unknown', fullName: '', description: '', 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<Load>({ status: 'loading', data: null, at: null, cached: false });
   const [officer, setOfficer] = useState<Officer | null>(null);
+  const [admin, setAdmin] = useState<Admin | null>(null);
   const [follows, setFollows] = useState<string[]>([]);
   const [seen, setSeen] = useState<Record<string, string>>({});
   const [notifOn, setNotifOnState] = useState(true);
@@ -82,11 +86,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       let savedFollows: string[] = [];
       let savedNotif = true;
       try {
-        const [f, s, n, o] = await Promise.all([K.follows, K.seen, K.notif, K.session].map((k) => AsyncStorage.getItem(k)));
+        const [f, s, n] = await Promise.all([K.follows, K.seen, K.notif].map((k) => AsyncStorage.getItem(k)));
         if (f) { savedFollows = JSON.parse(f); setFollows(savedFollows); }
         if (s) setSeen(JSON.parse(s));
         if (n) { savedNotif = JSON.parse(n); setNotifOnState(savedNotif); }
-        if (o) setOfficer(JSON.parse(o)); // officers stay signed in until they log out
       } catch {}
       load();
       // Register this device for push and record which groups it follows.
@@ -95,6 +98,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (token) repo.saveDevice(token, savedFollows, savedNotif).catch(() => {});
     })();
   }, [load]);
+
+  /** Shows the signed-in role and keeps a copy for offline starts. */
+  const applySession = useCallback((s: Session) => {
+    setOfficer(s.officer);
+    setAdmin(s.admin);
+    if (s.officer) save(K.session, s.officer); else AsyncStorage.removeItem(K.session).catch(() => {});
+    if (s.admin) save(K.admin, s.admin); else AsyncStorage.removeItem(K.admin).catch(() => {});
+  }, []);
+
+  // Officer and admin mode follow the live Firebase login plus officers/{uid} and admins/{uid}, so a
+  // disabled account, a switched-off officer or a removed record drops back to student view. The saved
+  // copy is used only when the phone is offline and the check can't run (staff stay signed in until they log out).
+  useEffect(() => {
+    const forget = () => applySession({ admin: null, officer: null });
+    (async () => {
+      try {
+        applySession(await repo.currentSession());
+      } catch (e) {
+        if (!(e instanceof OfflineError)) return;
+        const [o, a] = await Promise.all([K.session, K.admin].map((k) => AsyncStorage.getItem(k).catch(() => null)));
+        if (a) setAdmin(JSON.parse(a));
+        else if (o) setOfficer(JSON.parse(o));
+      }
+    })();
+    // Firebase signs the user out if their session is revoked while the app is open.
+    return repo.onSignedOut(forget);
+  }, [applySession]);
 
   // Tapping an announcement notification opens that post.
   useEffect(
@@ -119,6 +149,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const orgById = useCallback((id: string) => orgs.find((o) => o.id === id) ?? UNKNOWN, [orgs]);
 
+  // Follows of a group an admin removed are dropped, so this device's follow list stays within the
+  // groups the rules accept (otherwise its push registration would be refused).
+  const liveFollows = useMemo(() => {
+    if (!data) return follows;
+    const ids = new Set(data.orgs.map((o) => o.id));
+    return follows.filter((f) => ids.has(f));
+  }, [data, follows]);
+  const droppedFollow = liveFollows.length !== follows.length;
+
   const newCount = useCallback(
     (orgId: string) => feed.filter((a) => a.orgId === orgId && postTime(a) > (seen[orgId] ?? '')).length,
     [feed, seen],
@@ -137,12 +176,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (t) repo.saveDevice(t, nextFollows, enabled).catch(() => {});
   }, []);
 
+  // Save the trimmed list and re-register once a removed group has been dropped.
+  useEffect(() => {
+    if (!droppedFollow) return;
+    save(K.follows, liveFollows);
+    syncDevice(liveFollows, notifOn);
+  }, [droppedFollow, liveFollows, notifOn, syncDevice]);
+
   const toggleFollow = useCallback((id: string) => {
-    const next = follows.includes(id) ? follows.filter((x) => x !== id) : [...follows, id];
+    const next = liveFollows.includes(id) ? liveFollows.filter((x) => x !== id) : [...liveFollows, id];
     setFollows(next);
     save(K.follows, next);
     syncDevice(next, notifOn);
-  }, [follows, notifOn, syncDevice]);
+  }, [liveFollows, notifOn, syncDevice]);
 
   const setNotifOn = useCallback((v: boolean) => {
     setNotifOnState(v);
@@ -151,23 +197,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (v && !pushToken.current) {
       registerForPush().then((t) => {
         pushToken.current = t;
-        if (t) repo.saveDevice(t, follows, true).catch(() => {});
+        if (t) repo.saveDevice(t, liveFollows, true).catch(() => {});
       });
     } else {
-      syncDevice(follows, v);
+      syncDevice(liveFollows, v);
     }
-  }, [follows, syncDevice]);
+  }, [liveFollows, syncDevice]);
 
+  // Both reload the data: staff see drafts that guests can't, and those must appear (or go) at once.
   const signIn = useCallback(async (email: string, password: string) => {
-    const o = await repo.signIn(email, password);
-    setOfficer(o);
-    save(K.session, o);
-  }, []);
+    applySession(await repo.signIn(email, password));
+    load(true);
+  }, [applySession, load]);
   const signOut = useCallback(async () => {
-    setOfficer(null);
-    await repo.signOut().catch(() => {}); 
-    await AsyncStorage.removeItem(K.session).catch(() => {});
-  }, []);
+    applySession({ admin: null, officer: null });
+    await repo.signOut().catch(() => {});
+    load(true);
+  }, [applySession, load]);
 
   const showToast = useCallback((m: string) => {
     setToast(m);
@@ -210,8 +256,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     state,
     refresh: () => load(true),
     orgs, announcements, events, feed, liveEvents, upcoming, orgById,
-    officer, signIn, signOut,
-    follows, toggleFollow, newCount, markSeen,
+    officer, admin, signIn, signOut,
+    follows: liveFollows, toggleFollow, newCount, markSeen,
     notifOn, setNotifOn,
     saveAnnouncement: async (a, m) => {
       const before = announcements.find((x) => x.id === a.id);
@@ -231,6 +277,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return ok;
     },
     deleteEvent: (id) => run(() => repo.deleteEvent(id), 'Deleted.'),
+    saveOrg: (o, m) => run(() => repo.saveOrg(o, orgs.map((x) => x.id)), m),
+    deleteOrg: (id) => run(() => repo.deleteOrg(id, orgs.map((x) => x.id)), 'Group removed.'),
     toast, showToast,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

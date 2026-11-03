@@ -1,7 +1,10 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, deleteApp } from "firebase/app";
 import {
   initializeAuth,
   getAuth,
+  createUserWithEmailAndPassword,
+  inMemoryPersistence,
+  signOut,
   // The React Native build exports this at runtime, but the default type definitions omit it.
   // @ts-ignore
   getReactNativePersistence,
@@ -33,3 +36,21 @@ try {
 
 export const auth = authInstance;
 export const db = getFirestore(app);
+
+/**
+ * Makes a login for someone else (an admin adding an officer) without signing the admin out.
+ * createUserWithEmailAndPassword signs in as the new account, so it runs on a throwaway
+ * second Firebase app whose login lives in memory only; that app is deleted afterwards.
+ * Returns the new account's uid. Throws Firebase auth errors (e.g. auth/email-already-in-use).
+ */
+export async function createAccount(email: string, password: string): Promise<string> {
+  const temp = initializeApp(firebaseConfig, `create-account-${Date.now()}`);
+  try {
+    const tempAuth = initializeAuth(temp, { persistence: inMemoryPersistence });
+    const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
+    await signOut(tempAuth);
+    return cred.user.uid;
+  } finally {
+    await deleteApp(temp).catch(() => {});
+  }
+}

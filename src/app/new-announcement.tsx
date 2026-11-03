@@ -15,9 +15,13 @@ const CATS: Category[] = ['Announcement', 'Reminder', 'Deadline'];
 
 export default function NewAnnouncement() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { officer, announcements, events, saveAnnouncement } = useStore();
+  const { officer, admin, orgs, orgById, announcements, events, saveAnnouncement } = useStore();
   const existing = id ? announcements.find((a) => a.id === id) : undefined;
   const canSchedule = !existing || existing.status !== 'published';
+
+  // Officers always post for their own group. Admins choose any group; an existing post keeps its group.
+  const [orgId, setOrgId] = useState<string | undefined>(existing?.orgId ?? officer?.orgId);
+  const [pickOrg, setPickOrg] = useState(false);
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [body, setBody] = useState(existing?.body ?? '');
@@ -29,17 +33,17 @@ export default function NewAnnouncement() {
   const [pickEvent, setPickEvent] = useState(false);
   const [err, setErr] = useState('');
 
-  const snap = () => JSON.stringify([title, body, category, eventId, pinned, mode, when?.toISOString()]);
+  const snap = () => JSON.stringify([orgId, title, body, category, eventId, pinned, mode, when?.toISOString()]);
   const initial = useRef(snap()).current;
   const dirty = snap() !== initial;
 
-  const myEvents = events.filter((e) => e.orgId === officer?.orgId && e.status === 'published');
+  const myEvents = events.filter((e) => e.orgId === orgId && e.status === 'published');
   const linked = myEvents.find((e) => e.id === eventId);
-  const currentPin = announcements.find((a) => a.orgId === officer?.orgId && a.pinned && a.status !== 'draft' && a.id !== existing?.id);
-  const ready = title.trim() !== '' && body.trim() !== '' && (mode === 'Now' || !!when);
+  const currentPin = announcements.find((a) => a.orgId === orgId && a.pinned && a.status !== 'draft' && a.id !== existing?.id);
+  const ready = !!orgId && title.trim() !== '' && body.trim() !== '' && (mode === 'Now' || !!when);
 
   const persist = async (asDraft: boolean) => {
-    if (!officer) return false;
+    if (!orgId) return false;
     if (!asDraft && mode === 'Later' && (!when || when.getTime() <= Date.now())) {
       setErr('Pick a date and time in the future.');
       return false;
@@ -47,7 +51,7 @@ export default function NewAnnouncement() {
     const status = asDraft ? 'draft' : mode === 'Later' ? 'scheduled' : 'published';
     const a: Announcement = {
       id: existing?.id ?? `a_${Date.now()}`,
-      orgId: officer.orgId,
+      orgId,
       title: title.trim(), body: body.trim(), category, eventId, pinned,
       status,
       createdAt: existing?.status === 'published' && status === 'published' ? existing.createdAt : new Date().toISOString(),
@@ -60,13 +64,25 @@ export default function NewAnnouncement() {
   const finish = async (asDraft: boolean) => {
     if (await persist(asDraft)) { allow.current = true; router.back(); }
   };
-  const draftable = title.trim() !== '' || body.trim() !== '';
+  const draftable = !!orgId && (title.trim() !== '' || body.trim() !== '');
 
   return (
     <Screen edges={['top', 'bottom']}>
       <TopBar title={existing ? 'Edit announcement' : 'New announcement'} icon="close" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+          {admin ? (
+            <>
+              <Label>Post as</Label>
+              <Pressable
+                accessibilityRole="button" accessibilityState={{ disabled: !!existing }} disabled={!!existing} onPress={() => setPickOrg(true)}
+                style={({ pressed }) => [{ ...FIELD, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }, pressed && PRESSED]}
+              >
+                <Text style={{ fontSize: 16, color: orgId ? C.text : C.muted }}>{orgId ? orgById(orgId).name : 'Choose a group'}</Text>
+                {existing ? null : <Ionicons name="chevron-down" size={20} color={C.muted} />}
+              </Pressable>
+            </>
+          ) : null}
           <Input label="Title" value={title} onChangeText={setTitle} placeholder="What’s the announcement?" />
           <Input label="Details" multiline value={body} onChangeText={setBody} placeholder="Add the details students need" />
 
@@ -83,7 +99,7 @@ export default function NewAnnouncement() {
 
           <SwitchRow
             label="Pin to top" value={pinned} onChange={setPinned}
-            sub={pinned && currentPin ? `Replaces your current pinned post: “${currentPin.title}”` : undefined}
+            sub={pinned && currentPin ? `Replaces ${admin ? 'this group’s' : 'your current'} pinned post: “${currentPin.title}”` : undefined}
           />
 
           <View style={{ marginTop: 8 }}><Label>Publish</Label></View>
@@ -102,7 +118,11 @@ export default function NewAnnouncement() {
       </KeyboardAvoidingView>
 
       <MenuSheet
-        visible={pickEvent} onClose={() => setPickEvent(false)} title="Link one of your events"
+        visible={pickOrg} onClose={() => setPickOrg(false)} title="Post as"
+        items={orgs.map((o) => ({ label: o.name, onPress: () => { setOrgId(o.id); setEventId(undefined); } }))}
+      />
+      <MenuSheet
+        visible={pickEvent} onClose={() => setPickEvent(false)} title={admin ? 'Link one of this group’s events' : 'Link one of your events'}
         items={[
           { label: 'None', onPress: () => setEventId(undefined) },
           ...myEvents.map((e) => ({ label: `${e.title} · ${fmtShort(e.date)}`, onPress: () => setEventId(e.id) })),

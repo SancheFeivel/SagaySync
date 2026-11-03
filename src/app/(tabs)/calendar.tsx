@@ -140,16 +140,17 @@ export default function CalendarTab() {
 
 const s = StyleSheet.create({
   // Same surface as every other card in the app.
-  card: { ...CARD, padding: 12 },
+  card: { ...CARD, padding: 8 },
   monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   monthT: { fontSize: TYPE.title, fontWeight: '700', color: C.navy, fontFamily: SERIF, letterSpacing: -0.2 },
   dow: { flexDirection: 'row', marginBottom: SP.sm, paddingVertical: SP.xs },
   dowT: { width: `${100 / 7}%`, textAlign: 'center', color: C.muted, fontWeight: '700', fontSize: TYPE.caption, letterSpacing: 0.5 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, height: 52, alignItems: 'center', justifyContent: 'center' },
-  // Every day tile always has the same border + radius; only the border color changes.
+  // Padding gives every tile a gap so neighbors (holiday fill, selected border) never touch.
+  cell: { width: `${100 / 7}%`, height: 54, padding: 1.5, alignItems: 'center', justifyContent: 'center' },
+  // Tile fills its column (max 50) instead of a fixed size, which overflowed on narrow phones.
   day: {
-    width: 44, height: 44, borderRadius: R.md,
+    width: '100%', maxWidth: 50, aspectRatio: 1, borderRadius: R.md,
     borderWidth: 2, borderColor: 'transparent',
     overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
@@ -158,7 +159,8 @@ const s = StyleSheet.create({
   selected: { borderColor: C.navy },
   holidayFill: { backgroundColor: C.soft },
   dayT: { fontWeight: '600', color: C.text, fontSize: TYPE.body },
-  dot: { position: 'absolute', bottom: 3, width: 6, height: 6, borderRadius: 3, backgroundColor: C.navy2 },
+  // Pinned near the tile's bottom edge so the number stays centered in the square.
+  dot: { position: 'absolute', bottom: 2, width: 5, height: 5, borderRadius: 2.5, backgroundColor: C.navy2 },
   listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: SP.xxl, marginBottom: SP.md, paddingHorizontal: SP.xs },
   sel: { fontSize: TYPE.title, fontWeight: '700', color: C.text, fontFamily: SERIF },
   count: { color: C.muted, fontWeight: '600', fontSize: TYPE.caption },

@@ -1,0 +1,13 @@
+{
+  "name": "sagaysync-rules-test",
+  "private": true,
+  "description": "Firestore security rules tests. Runs against the local emulator only.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test rules.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.2.0"
+  }
+}
